@@ -1,0 +1,9 @@
+This video demonstrates a forensic audio geolocation methodology using background thunder sounds from a video.
+
+Lightning strike timing/position data was sourced by logging the Blitzortung/lightningmaps.org socket feed for ~3wks. For each candidate location, slant distance and inverse-square attenuation were used to model an acoustic curve from the lightning data, using signal processing techniques in Python. This curve was then compared against the observed audio's bandpassed (20-250hz) RMS envelope using cosine similarity, and computed across all possible time offsets using FFT-based cross-correlation.
+
+The methodology was validated blind against a known location, then tested under progressively less-constrained scenarios: (1) Full-world search with known date, unknown time, then (2) known region, ~3-wk temporal uncertainty.
+
+The approach could be improved by using paid/commercial lightning detection data (e.g., Xweather, Vaisala GLD360, Earth Networks ENTLN) for tighter positional accuracy per strike.
+
+Idea was inspired by Benn Jordan's video on infrasound; would highly recommend if you haven't seen it.

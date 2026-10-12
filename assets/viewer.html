@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thunder Locator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root { --bg: #f6f6f4; --panel: #ffffffee; --fg: #1d1d1f; --muted: #6b6b70; --line: #d8d8dc; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141416; --panel: #1e1e22ee; --fg: #ececf0; --muted: #9a9aa2; --line: #34343a; }
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #map { position: absolute; inset: 0; }
+  .panel { position: absolute; z-index: 1000; top: 12px; right: 12px; width: 280px; max-height: calc(100% - 24px);
+    overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+    backdrop-filter: blur(6px); }
+  .panel h1 { font-size: 14px; margin: 0 0 2px; }
+  .panel .sub { color: var(--muted); margin-bottom: 10px; }
+  .row { display: flex; gap: 10px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  .cand { border-top: 1px solid var(--line); padding: 6px 0; cursor: pointer; }
+  .cand:hover { color: #e8590c; }
+  .cand b { font-variant-numeric: tabular-nums; }
+  .ramp { height: 8px; border-radius: 4px; margin: 4px 0 2px;
+    background: linear-gradient(90deg, #30123b, #4662d7, #1ae4b6, #a2fc3c, #fabb39, #e4460a, #7a0403); }
+  .legend { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+  @media (max-width: 600px) { .panel { left: 16px; right: 16px; width: auto; top: auto; bottom: 16px; max-height: 45%; } }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel">
+  <h1>Thunder locator</h1>
+  <div class="sub" id="runinfo"></div>
+  <div class="row">
+    <label><input type="checkbox" data-level="coarse" checked> coarse</label>
+    <label><input type="checkbox" data-level="mid" checked> mid</label>
+    <label><input type="checkbox" data-level="fine" checked> fine</label>
+  </div>
+  <div class="row">
+    <label>colour <select id="metric"><option value="prob">posterior (log)</option><option value="rho">correlation</option></select></label>
+    <label><input type="checkbox" id="cr90"> 90% region only</label>
+  </div>
+  <div class="ramp"></div><div class="legend"><span id="lo">low</span><span id="hi">high</span></div>
+  <div id="cands"></div>
+</div>
+<script>
+const DATA = /*GEOJSON*/null;
+const RUN = /*RUN*/null;
+const RAMP = ["#30123b","#4662d7","#1ae4b6","#a2fc3c","#fabb39","#e4460a","#7a0403"];
+const color = t => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.round(t * (RAMP.length - 1))))];
+
+const map = L.map("map", { preferCanvas: true });
+const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Esri" });
+L.control.layers({ "Map": osm, "Satellite": sat }, {}, { position: "topleft" }).addTo(map);
+
+const cells = DATA.features.filter(f => f.properties.kind === "cell");
+const cands = DATA.features.filter(f => f.properties.kind === "candidate");
+const groupKey = p => p.level + ":" + (p.region ?? "");
+const ranges = {};
+for (const f of cells) {
+  const p = f.properties, k = groupKey(p);
+  const lp = Math.log10(Math.max(p.prob, 1e-300));
+  const r = ranges[k] ??= { pmax: -Infinity, rmax: 0 };
+  r.pmax = Math.max(r.pmax, lp); r.rmax = Math.max(r.rmax, p.rho);
+}
+function shade(p, metric) {
+  const r = ranges[groupKey(p)];
+  if (metric === "rho") return r.rmax > 0 ? p.rho / r.rmax : 0;
+  return Math.max(0, 1 + (Math.log10(Math.max(p.prob, 1e-300)) - r.pmax) / 4);
+}
+
+let layer;
+function draw() {
+  const levels = new Set([...document.querySelectorAll("[data-level]")].filter(e => e.checked).map(e => e.dataset.level));
+  const metric = document.getElementById("metric").value;
+  const onlyCr = document.getElementById("cr90").checked;
+  document.getElementById("lo").textContent = metric === "rho" ? "0" : "10⁻⁴ × max";
+  document.getElementById("hi").textContent = metric === "rho" ? "max ρ in level" : "max";
+  if (layer) layer.remove();
+  layer = L.geoJSON({ type: "FeatureCollection", features: cells.filter(f =>
+      levels.has(f.properties.level) && (!onlyCr || f.properties.level !== "fine" || f.properties.in_cr90)) }, {
+    style: f => { const t = shade(f.properties, metric);
+      return { stroke: false, fillColor: color(t), fillOpacity: t < 0.02 ? 0 : 0.25 + 0.5 * t }; },
+    onEachFeature: (f, l) => { const p = f.properties;
+      l.bindTooltip(`${p.level} · ρ ${p.rho.toFixed(3)} · log ev ${p.log_ev.toFixed(1)}<br>start ${p.start_utc} · ${p.strikes} strikes`); },
+  }).addTo(map);
+  layer.bringToBack();
+}
+
+const markers = cands.map(f => {
+  const p = f.properties, [lon, lat] = f.geometry.coordinates;
+  const wind = Math.hypot(p.wind_e_mps, p.wind_n_mps);
+  const html = `<b>#${p.rank}</b> ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>P(region) ${(p.region_prob * 100).toFixed(1)}% · ρ ${p.rho.toFixed(3)}<br>`
+    + `start ${p.start_utc}<br>c ${p.c_mps.toFixed(1)} m/s · wind ${wind.toFixed(1)} m/s<br>90% region ${p.cr90_area_km2.toFixed(2)} km²`;
+  const m = L.circleMarker([lat, lon], { radius: 7, color: "#fff", weight: 2, fillColor: "#e8590c", fillOpacity: 1 })
+    .bindPopup(html).addTo(map);
+  const div = document.createElement("div");
+  div.className = "cand"; div.innerHTML = html;
+  div.onclick = () => { map.setView([lat, lon], 13); m.openPopup(); };
+  document.getElementById("cands").appendChild(div);
+  return m;
+});
+
+for (const f of DATA.features.filter(f => f.properties.kind === "onset")) {
+  const p = f.properties, [lon, lat] = f.geometry.coordinates;
+  const sig = Math.max(p.sigma_e_km, p.sigma_n_km) * 1000;
+  L.circle([lat, lon], { radius: sig, color: "#1c7ed6", weight: 1.5, fill: false, dashArray: "4 4" }).addTo(map);
+  L.circleMarker([lat, lon], { radius: 5, color: "#fff", weight: 2, fillColor: "#1c7ed6", fillOpacity: 1 })
+    .bindPopup(`<b>Onset solve</b> ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>±${p.sigma_e_km.toFixed(2)} E / ±${p.sigma_n_km.toFixed(2)} N km (1σ)<br>`
+      + `start ${p.start_utc}<br>${p.inliers}/${p.onsets} onsets matched · rms ${p.rms_resid_s.toFixed(2)} s`).addTo(map);
+}
+
+document.getElementById("runinfo").textContent = RUN ? `${RUN.model} model · ${RUN.audio} · ${RUN.date}` : "";
+document.querySelectorAll("input, select").forEach(e => e.addEventListener("change", draw));
+draw();
+if (markers.length) map.setView(markers[0].getLatLng(), 11); else map.fitBounds(layer.getBounds());
+</script>
+</body>
+</html>
