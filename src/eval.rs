@@ -54,10 +54,29 @@ pub fn report(run_dir: &Path, truth: &Truth) -> Result<()> {
         pr["level"] == "fine" && pr["in_cr90"] == true && contains(&f["geometry"], &t)
     });
     println!("truth inside a fine 90% region: {inside}");
+    println!("truth credible level: {}", credible_level(&heat, &t));
     for level in ["coarse", "mid"] {
         println!("{level}: {}", truth_rank(&heat, level, &t));
     }
     Ok(())
+}
+
+/// Posterior mass of the truth's fine region lying in cells more probable than the truth's cell.
+/// Calibrated output puts this below 0.9 for ~90% of cases.
+fn credible_level(heat: &Value, t: &LatLon) -> String {
+    let fine: Vec<&Value> = heat["features"].as_array().unwrap().iter().filter(|f| f["properties"]["level"] == "fine").collect();
+    let Some(hit) = fine.iter().find(|f| contains(&f["geometry"], t)) else {
+        return "outside all fine regions".into();
+    };
+    let region = &hit["properties"]["region"];
+    let p_t = hit["properties"]["prob"].as_f64().unwrap();
+    let above: f64 = fine
+        .iter()
+        .filter(|f| &f["properties"]["region"] == region)
+        .map(|f| f["properties"]["prob"].as_f64().unwrap())
+        .filter(|&p| p > p_t)
+        .sum();
+    format!("{above:.3} (region {region})")
 }
 
 /// Rank (by peak correlation) of the cell containing the truth within one level.

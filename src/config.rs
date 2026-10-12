@@ -49,7 +49,7 @@ fn defaults(kind: ModelKind) -> SearchConfig {
         fine: Stage { spacing_km: 0.5, rate_hz: 10.0, smooth_s: 0.5 },
         min_strikes: 3,
         coarse_peaks: 100,
-        fine_regions: 5,
+        fine_regions: 3,
         mid_half_km: 2.5,
         fine_half_km: 12.0,
         fine_time_margin_s: 120.0,

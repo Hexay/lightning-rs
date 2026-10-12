@@ -22,10 +22,10 @@ for c in "${CASES[@]}"; do
   [ -f "$dir/audio.wav" ] || (cd "$ROOT" && "$BIN" sim --date 2025-07-19 --lat "$lat" --lon "$lon" --start "$start" \
       --temp="$temp" --wind-e="$we" --wind-n="$wn" --noise "$noise" --seed "$seed" --out "$dir" >/dev/null)
   for m in $MODELS; do
-    out="$ROOT/out/sim/$name-$m"
+    out="$ROOT/out/sim/$name-$m${OVR:+-$(basename "$OVR" .toml)}"
     mkdir -p "$ROOT/out/sim"
     (cd "$ROOT" && "$BIN" locate --audio "$dir/audio.wav" --date 2025-07-19 --model "$m" --out "$out" ${OVR:+--overrides "$OVR"} >"$out.txt" 2>"$out.log") || { echo "$name $m FAILED"; tail -5 "$out.log"; continue; }
     echo "== $name [$m] $(grep -o 'in [0-9.]*s total' "$out.log")"
-    (cd "$ROOT" && "$BIN" eval --run "$out" --truth "$dir/truth.toml" | grep -E "^#1 |^#2 |inside|^onset solve|^coarse:|^mid:" | head -9)
+    (cd "$ROOT" && "$BIN" eval --run "$out" --truth "$dir/truth.toml" | grep -E "^#1 |^#2 |credible|^onset solve|^coarse:|^mid:" | grep -vE "^onset solve error [0-9]{3}" | head -9)
   done
 done
