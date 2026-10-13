@@ -54,9 +54,9 @@ const RAMP = ["#30123b","#4662d7","#1ae4b6","#a2fc3c","#fabb39","#e4460a","#7a04
 const color = t => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.round(t * (RAMP.length - 1))))];
 
 const map = L.map("map", { preferCanvas: true });
-// Not tile.openstreetmap.org: it answers 403 to file:// pages (no Referer), and the viewer is opened from disk.
-const osm = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-  { maxZoom: 19, subdomains: "abcd", attribution: "© OpenStreetMap contributors © CARTO" }).addTo(map);
+// Keyless and works from file://: OSM tiles 403 without a Referer, CARTO now serves an "API key required" tile.
+const osm = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+  { maxZoom: 19, attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors" }).addTo(map);
 const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Esri" });
 L.control.layers({ "Map": osm, "Satellite": sat }, {}, { position: "topleft" }).addTo(map);
 
