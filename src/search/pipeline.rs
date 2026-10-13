@@ -31,6 +31,7 @@ pub struct SearchConfig {
     /// Fraction of nominal independent samples credited to the likelihood (tempering for model error).
     pub n_eff_factor: f64,
     pub feature: Feature,
+    pub robust_lags: usize,
 }
 
 #[derive(Serialize)]
@@ -139,6 +140,7 @@ pub(crate) fn scorer<'a>(cfg: &'a SearchConfig, index: &'a StrikeIndex, audio: &
         template: Template::new(&observed_feature(cfg, audio, stage), cfg.kind == ModelKind::Improved),
         start_range: range,
         min_strikes: cfg.min_strikes,
+        robust_lags: if cfg.kind == ModelKind::Improved { cfg.robust_lags } else { 0 },
         n_eff: n_eff * cfg.n_eff_factor,
     }
 }

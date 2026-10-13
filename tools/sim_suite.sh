@@ -10,6 +10,7 @@ MODELS="${1:-both}"; FILTER="${2:-}"
 # name lat lon start temp wind_e wind_n noise seed
 # side_*: listener ~15 km off a storm core (like the real clip); the rest: inside/next to dense storms (hard tier).
 CASES=(
+  "real_twin 65.666899 14.138535 15:59:51 14 0 0 0.02 7"
   "side_e_of_8E 62.25 8.55 15:10:00 14 2 -3 0.03 11"
   "side_n_of_west_coast 58.40 11.75 13:20:00 18 -3 2 0.03 12"
   "side_w_of_19E 65.25 18.90 14:30:00 12 4 4 0.03 13"

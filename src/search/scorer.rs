@@ -1,6 +1,7 @@
 use super::feature::Feature;
 use std::time::Instant;
 use super::ncc::{Scratch, Template};
+use super::robust::robust_rho;
 use crate::geo::LatLon;
 use crate::model::params::{Atmosphere, ModelKind, Physics};
 use crate::model::propagation::{Arrival, arrival};
@@ -35,6 +36,8 @@ pub struct Scorer<'a> {
     /// Recording start search range, epoch seconds.
     pub start_range: (f64, f64),
     pub min_strikes: usize,
+    /// Top lags re-scored with the outlier-robust fit (0 = plain correlation only).
+    pub robust_lags: usize,
     /// Effective independent samples in the clip; scales correlation into log-likelihood.
     pub n_eff: f64,
 }
@@ -50,6 +53,10 @@ pub struct Workspace {
     p1: Vec<f64>,
     p2: Vec<f64>,
     ncc: Scratch,
+    rho: Vec<f32>,
+    count: Vec<u32>,
+    lls: Vec<f64>,
+    robust_scratch: Vec<f64>,
     /// Cumulative seconds in [query+arrivals, render, prefix+correlate, reduce].
     pub phase_s: [f64; 4],
 }
@@ -113,12 +120,36 @@ impl Scorer<'_> {
     }
 
     /// Turns per-lag correlations into the best lag and the time-marginalised evidence.
-    fn reduce(&self, origin: f64, ws: &Workspace) -> PointScore {
+    fn reduce(&self, origin: f64, ws: &mut Workspace) -> PointScore {
+        self.lag_correlations(ws);
+        if self.robust_lags > 0 {
+            self.rescore_peaks(ws);
+        }
+        let mut best = PointScore::default();
+        ws.lls.clear();
+        for (k, &rho) in ws.rho.iter().enumerate() {
+            if rho.is_nan() {
+                continue;
+            }
+            let rho = (rho as f64).clamp(0.0, 0.999);
+            ws.lls.push(-0.5 * self.n_eff * (1.0 - rho * rho).ln());
+            if rho as f32 > best.best_rho {
+                best.best_rho = rho as f32;
+                best.best_start = origin + k as f64 / self.stage.rate_hz;
+                best.strikes_in_window = ws.count[k];
+            }
+        }
+        best.log_ev = log_mean_exp_with_nulls(&ws.lls, ws.rho.len());
+        best
+    }
+
+    /// FFT-correlation → per-lag correlation (NaN where the window has too few strikes or no energy).
+    fn lag_correlations(&self, ws: &mut Workspace) {
         let (num, p1, p2, onsets) = (&ws.ncc.num, &ws.p1, &ws.p2, &ws.rendered.onset_idx);
         let l = self.template.len;
         let (mut lo, mut hi) = (0usize, 0usize);
-        let mut best = PointScore::default();
-        let mut lls = Vec::new();
+        ws.rho.clear();
+        ws.count.clear();
         for (k, &nk) in num.iter().enumerate() {
             while lo < onsets.len() && onsets[lo] < k {
                 lo += 1;
@@ -127,24 +158,30 @@ impl Scorer<'_> {
                 hi += 1;
             }
             let count = hi.saturating_sub(lo);
-            if count < self.min_strikes {
-                continue;
-            }
             let (s1, s2) = (p1[k + l] - p1[k], p2[k + l] - p2[k]);
             let energy = if self.template.centered { s2 - s1 * s1 / l as f64 } else { s2 };
-            if energy <= 1e-12 * s2.max(1e-30) {
-                continue;
-            }
-            let rho = (nk as f64 / energy.sqrt()).clamp(0.0, 0.999);
-            lls.push(-0.5 * self.n_eff * (1.0 - rho * rho).ln());
-            if rho as f32 > best.best_rho {
-                best.best_rho = rho as f32;
-                best.best_start = origin + k as f64 / self.stage.rate_hz;
-                best.strikes_in_window = count as u32;
-            }
+            let valid = count >= self.min_strikes && energy > 1e-12 * s2.max(1e-30);
+            ws.rho.push(if valid { (nk as f64 / energy.sqrt()) as f32 } else { f32::NAN });
+            ws.count.push(count as u32);
         }
-        best.log_ev = log_mean_exp_with_nulls(&lls, num.len());
-        best
+    }
+
+    /// Replaces the correlation at the top few separated lags with the outlier-robust fit.
+    fn rescore_peaks(&self, ws: &mut Workspace) {
+        let l = self.template.len;
+        let sep = ((2.0 * self.stage.smooth_s * self.stage.rate_hz) as usize).max(1);
+        let mut chosen: Vec<usize> = Vec::with_capacity(self.robust_lags);
+        for _ in 0..self.robust_lags {
+            let pick = (0..ws.rho.len())
+                .filter(|&k| !ws.rho[k].is_nan() && chosen.iter().all(|&c| c.abs_diff(k) >= sep))
+                .max_by(|&a, &b| ws.rho[a].total_cmp(&ws.rho[b]));
+            let Some(k) = pick else { break };
+            chosen.push(k);
+        }
+        for k in chosen {
+            let x = &ws.rendered.samples[k..k + l];
+            ws.rho[k] = robust_rho(x, &self.template.values, &mut ws.robust_scratch) as f32;
+        }
     }
 }
 

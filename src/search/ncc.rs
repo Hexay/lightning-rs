@@ -7,6 +7,8 @@ pub struct Template {
     pub len: usize,
     /// Pearson (zero-mean template, variance-normalised windows) vs plain cosine.
     pub centered: bool,
+    /// The (centred, unit-norm) template in the time domain, for re-scoring individual lags.
+    pub values: Vec<f32>,
     fft_size: usize,
     step: usize,
     spectrum: Vec<Complex32>,
@@ -42,7 +44,8 @@ impl Template {
         fft.process(&mut spectrum);
         let scale = 1.0 / fft_size as f32;
         spectrum.iter_mut().for_each(|c| *c *= scale);
-        Self { len, centered, fft_size, step: fft_size - len + 1, spectrum, fft, ifft }
+        let values = o.iter().map(|v| (v / norm) as f32).collect();
+        Self { len, centered, values, fft_size, step: fft_size - len + 1, spectrum, fft, ifft }
     }
 
     /// num[k] = Σ_t model[k+t]·ô[t] for every lag k with the window inside `model`.

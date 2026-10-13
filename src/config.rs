@@ -30,6 +30,7 @@ overrides! {
     fine_regions: usize,
     mid_half_km: f64,
     fine_half_km: f64,
+    robust_lags: usize,
 }
 
 pub fn search_config(kind: ModelKind, overrides: Option<&Path>) -> anyhow::Result<SearchConfig> {
@@ -59,6 +60,8 @@ fn defaults(kind: ModelKind) -> SearchConfig {
         floor_window_s: 30.0,
         n_eff_factor: 0.5,
         feature: Feature::Envelope,
+        // Off: on the sim tier and real clip it lifted false candidates as much as the truth (no gain).
+        robust_lags: 0,
     }
 }
 

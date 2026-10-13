@@ -3,5 +3,6 @@ pub mod grid;
 pub mod ncc;
 pub mod pipeline;
 pub mod probe;
+pub mod robust;
 pub mod scorer;
 pub mod select;
