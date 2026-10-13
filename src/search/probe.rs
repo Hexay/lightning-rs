@@ -15,15 +15,16 @@ pub fn print(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f
     for (name, stage) in [("coarse", cfg.coarse), ("mid", cfg.mid), ("fine", cfg.fine)] {
         let day_s = scorer(cfg, index, audio, stage, (day.0, day.1 - audio.duration_s)).score(&p, &atm, &mut ws);
         print!(
-            "{name:>6}: day  rho {:.3} log_ev {:7.2} start {} ({} strikes)",
+            "{name:>6}: day  rho {:.3} log_ev {:7.2} doa {:.1} start {} ({} strikes)",
             day_s.best_rho,
             day_s.log_ev,
+            day_s.doa_ll,
             format_utc(day_s.best_start),
             day_s.strikes_in_window
         );
         if let Some(t) = start {
             let pinned = scorer(cfg, index, audio, stage, (t, t + 0.5 / stage.rate_hz)).score(&p, &atm, &mut ws);
-            print!(" | pinned rho {:.3} ({} strikes)", pinned.best_rho, pinned.strikes_in_window);
+            print!(" | pinned rho {:.3} doa {:.1} ({} strikes)", pinned.best_rho, pinned.doa_ll, pinned.strikes_in_window);
         }
         println!();
     }

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Synthetic accuracy suite on 2025-07-19 storms away from the real test region.
-# Usage: [OVR=overrides.toml] tools/sim_suite.sh [improved|baseline|both] [case-filter]
+# Usage: [OVR=overrides.toml] [MICS="spacing_m axis_deg"] tools/sim_suite.sh [improved|baseline|both] [case-filter]
+# MICS synthesises a two-mic (stereo) recording into data/sim/<case>-stereo.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$ROOT/target/release/lightning-rs"
@@ -23,9 +24,12 @@ CASES=(
 for c in "${CASES[@]}"; do
   read -r name lat lon start temp we wn noise seed <<<"$c"
   [[ -n "$FILTER" && "$name" != *"$FILTER"* ]] && continue
+  read -r spacing axis <<<"${MICS:-0 0}"
+  [ "$spacing" != 0 ] && name="$name-stereo"
   dir="$ROOT/data/sim/$name"
   [ -f "$dir/audio.wav" ] || (cd "$ROOT" && "$BIN" sim --date 2025-07-19 --lat "$lat" --lon "$lon" --start "$start" \
-      --temp="$temp" --wind-e="$we" --wind-n="$wn" --noise "$noise" --seed "$seed" --out "$dir" >/dev/null)
+      --temp="$temp" --wind-e="$we" --wind-n="$wn" --noise "$noise" --seed "$seed" \
+      --mic-spacing "$spacing" --mic-axis="$axis" --out "$dir" >/dev/null)
   for m in $MODELS; do
     out="$ROOT/out/sim/$name-$m${OVR:+-$(basename "$OVR" .toml)}"
     mkdir -p "$ROOT/out/sim"

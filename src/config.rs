@@ -33,7 +33,9 @@ overrides! {
     fine_half_km: f64,
     robust_lags: usize,
     nuisance: Vec<Atmosphere>,
+    min_strikes: usize,
     free_amp: Option<FreeAmp>,
+    use_stereo: bool,
 }
 
 pub fn search_config(kind: ModelKind, overrides: Option<&Path>) -> anyhow::Result<SearchConfig> {
@@ -66,6 +68,8 @@ fn defaults(kind: ModelKind) -> SearchConfig {
         // Off: on the sim tier and real clip it lifted false candidates as much as the truth (no gain).
         robust_lags: 0,
         free_amp: None,
+        // Off: on a 0.15 m stereo sim inside a storm it added only a few nats at the truth (see doa.rs).
+        use_stereo: false,
     }
 }
 

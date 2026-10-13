@@ -38,6 +38,9 @@ pub fn report(run_dir: &Path, truth: &Truth) -> Result<()> {
             line += &format!("  start error {:+.1} s", r["score"]["best_start"].as_f64().unwrap() - s);
         }
         println!("{line}");
+        if r["rank"].as_u64() == Some(0) {
+            println!("{}", shape_line(&r["shape"], &p, &t));
+        }
     }
     for s in cands["onset_solutions"].as_array().into_iter().flatten() {
         let p = LatLon::new(s["pos"]["lat"].as_f64().unwrap(), s["pos"]["lon"].as_f64().unwrap());
@@ -63,6 +66,24 @@ pub fn report(run_dir: &Path, truth: &Truth) -> Result<()> {
 
 /// Posterior mass of the truth's fine region lying in cells more probable than the truth's cell.
 /// Calibrated output puts this below 0.9 for ~90% of cases.
+/// The #1 region's ellipse and heard-strike geometry, with the truth offset split along/across the long axis.
+fn shape_line(s: &Value, map: &LatLon, t: &LatLon) -> String {
+    let f = |k: &str| s[k].as_f64().unwrap_or(f64::NAN);
+    let (e, n) = map.enu_km(t);
+    let b = f("major_bearing_deg").to_radians();
+    let along = e * b.sin() + n * b.cos();
+    let across = -e * b.cos() + n * b.sin();
+    format!(
+        "shape: 90% ellipse {:.1} x {:.1} km @ {:.0}°, storm @ {:.0}°, {} strikes heard{}, spread {:.0}°; truth offset {:+.2} along / {:+.2} across km",
+        f("major_km"), f("minor_km"), f("major_bearing_deg"), f("storm_bearing_deg"),
+        s["audible_strikes"],
+        if s["audible_strikes"].as_u64().unwrap_or(0) as usize >= crate::search::shape::MIN_RELIABLE_STRIKES { "" } else { " (UNRELIABLE)" },
+        f("azimuth_spread_deg"),
+        along,
+        across
+    )
+}
+
 fn credible_level(heat: &Value, t: &LatLon) -> String {
     let fine: Vec<&Value> = heat["features"].as_array().unwrap().iter().filter(|f| f["properties"]["level"] == "fine").collect();
     let Some(hit) = fine.iter().find(|f| contains(&f["geometry"], t)) else {

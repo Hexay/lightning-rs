@@ -72,6 +72,13 @@ pub fn parse_date(s: &str) -> anyhow::Result<f64> {
     Ok(days as f64 * 86400.0)
 }
 
+/// `HH:MM:SS[.sss]` on the UTC day starting at epoch `day`.
+pub fn parse_hms(day: f64, s: &str) -> anyhow::Result<f64> {
+    let hms: Vec<f64> = s.split(':').map(str::parse).collect::<Result<_, _>>()?;
+    anyhow::ensure!(hms.len() == 3, "time must be HH:MM:SS[.sss], got {s}");
+    Ok(day + hms[0] * 3600.0 + hms[1] * 60.0 + hms[2])
+}
+
 pub fn format_utc(epoch: f64) -> String {
     let secs = epoch.floor() as i64;
     let (y, m, d) = civil_from_days(secs.div_euclid(86400));

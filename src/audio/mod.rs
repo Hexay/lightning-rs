@@ -1,6 +1,7 @@
 pub mod decode;
 pub mod envelope;
 pub mod filter;
+pub mod stereo;
 
 use anyhow::Result;
 use std::path::Path;
@@ -12,6 +13,8 @@ pub const ANALYSIS_FS: f64 = 2000.0;
 pub struct BandAudio {
     pub samples: Vec<f32>,
     pub duration_s: f64,
+    /// Usable inter-channel lags when the file is genuine stereo.
+    pub lags: Option<stereo::LagTrack>,
 }
 
 pub fn load_band(path: &Path, lo_hz: f64, hi_hz: f64) -> Result<BandAudio> {
@@ -19,7 +22,8 @@ pub fn load_band(path: &Path, lo_hz: f64, hi_hz: f64) -> Result<BandAudio> {
     anyhow::ensure!(!samples.is_empty(), "no audio decoded from {}", path.display());
     filter::bandpass_zero_phase(&mut samples, lo_hz, hi_hz, ANALYSIS_FS);
     let duration_s = samples.len() as f64 / ANALYSIS_FS;
-    Ok(BandAudio { samples, duration_s })
+    let lags = stereo::load_lag_track(path, lo_hz, hi_hz)?;
+    Ok(BandAudio { samples, duration_s, lags })
 }
 
 /// Observed envelope at `rate` Hz, smoothed by `smooth_s`, with the noise floor optionally removed.

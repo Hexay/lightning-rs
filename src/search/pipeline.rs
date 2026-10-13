@@ -4,6 +4,7 @@ use super::grid::{self, Cell};
 use super::ncc::Template;
 use super::scorer::{PointScore, Scorer, Stage, Workspace};
 use super::select::{credible_region, posterior, rank_key, separated_peaks, softmax};
+use super::shape::{Heard, Shape, shape};
 use crate::audio::{BandAudio, observed_envelope};
 use crate::geo::LatLon;
 use crate::model::params::{Atmosphere, BASELINE_C_MPS, ModelKind, Physics};
@@ -35,6 +36,8 @@ pub struct SearchConfig {
     pub robust_lags: usize,
     /// Fine-stage per-strike loudness refit (improved model, envelope feature).
     pub free_amp: Option<FreeAmp>,
+    /// Add stereo direction evidence when the audio has a usable lag track.
+    pub use_stereo: bool,
 }
 
 #[derive(Serialize)]
@@ -57,6 +60,7 @@ pub struct Region {
     pub atmosphere: Atmosphere,
     pub cr90_area_km2: f64,
     pub region_prob: f64,
+    pub shape: Shape,
 }
 
 pub struct SearchResult {
@@ -64,6 +68,7 @@ pub struct SearchResult {
     pub regions: Vec<Region>,
 }
 
+/// `day` bounds the recording: it starts at or after `day.0` and ends by `day.1`.
 pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64, f64)) -> SearchResult {
     let default_atm = match cfg.kind {
         ModelKind::Improved => Atmosphere::from_temp(15.0, 0.0, 0.0),
@@ -78,7 +83,7 @@ pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64
     let coarse_cells = prune_inactive(&all, index, cfg, audio.duration_s);
     let coarse = score_cells(&coarse_scorer, &coarse_cells, &[default_atm], "coarse");
     // Coarse/mid evidence is swamped by the day-long time prior (≈0 everywhere); peak correlation selects.
-    let keys: Vec<f64> = coarse.iter().map(|s| s.best_rho as f64).collect();
+    let keys: Vec<f64> = coarse.iter().map(|s| coarse_scorer.select_key(s)).collect();
     // No separation here: near-duplicates of a strong peak must not crowd out the truth's own cell.
     let peaks = separated_peaks(&coarse_cells, &keys, cfg.coarse_peaks, 0.0);
     push_level(&mut out, &coarse_cells, coarse, "coarse", None);
@@ -89,7 +94,7 @@ pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64
         mid_cells.extend(grid::around(coarse_cells[p].center, cfg.mid_half_km, cfg.mid.spacing_km));
     }
     let mid = score_cells(&mid_scorer, &mid_cells, &[default_atm], "mid");
-    let keys: Vec<f64> = mid.iter().map(|s| s.best_rho as f64).collect();
+    let keys: Vec<f64> = mid.iter().map(|s| mid_scorer.select_key(s)).collect();
     let fine_peaks = separated_peaks(&mid_cells, &keys, cfg.fine_regions, 2.0 * cfg.fine_half_km);
     let fine_seeds: Vec<(LatLon, f64)> = fine_peaks.iter().map(|&i| (mid_cells[i].center, mid[i].best_start)).collect();
     push_level(&mut out, &mid_cells, mid, "mid", None);
@@ -100,7 +105,7 @@ pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64
     };
     let mut regions = Vec::new();
     for (r, (center, start)) in fine_seeds.into_iter().enumerate() {
-        let range = (start - cfg.fine_time_margin_s, start + cfg.fine_time_margin_s);
+        let range = ((start - cfg.fine_time_margin_s).max(day_range.0), (start + cfg.fine_time_margin_s).min(day_range.1));
         let mut fine_scorer = scorer(cfg, index, audio, cfg.fine, range);
         if cfg.kind == ModelKind::Improved && cfg.feature() == Feature::Envelope {
             fine_scorer.free_amp = cfg.free_amp;
@@ -116,6 +121,9 @@ pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64
         let (inside, area) = credible_region(&cells, &region_cells.iter().map(|c| c.prob).collect::<Vec<_>>(), 0.9);
         region_cells.iter_mut().zip(inside).for_each(|(c, i)| c.in_cr90 = i);
         let (map, best) = polish(cfg, &fine_scorer, cells[map_i].center, atms[map_i]);
+        let probs: Vec<f64> = region_cells.iter().map(|c| c.prob).collect();
+        let heard = Heard { index, phys: &cfg.phys, atm: atms[map_i], listener: map, start: best.best_start, duration_s: audio.duration_s };
+        let shape = shape(&cells, &probs, heard);
         regions.push(Region {
             rank: r,
             map,
@@ -124,6 +132,7 @@ pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64
             atmosphere: atms[map_i],
             cr90_area_km2: area,
             region_prob: 0.0,
+            shape,
         });
     }
     regions.sort_by(|a, b| rank_key(cfg.kind, &b.score).total_cmp(&rank_key(cfg.kind, &a.score)));
@@ -135,7 +144,7 @@ pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64
     SearchResult { cells: out, regions }
 }
 
-pub(crate) fn scorer<'a>(cfg: &'a SearchConfig, index: &'a StrikeIndex, audio: &BandAudio, stage: Stage, range: (f64, f64)) -> Scorer<'a> {
+pub(crate) fn scorer<'a>(cfg: &'a SearchConfig, index: &'a StrikeIndex, audio: &'a BandAudio, stage: Stage, range: (f64, f64)) -> Scorer<'a> {
     let n_eff = audio.duration_s / (2.0 * std::f64::consts::PI.sqrt() * stage.smooth_s.max(0.5 / stage.rate_hz));
     Scorer {
         index,
@@ -148,6 +157,7 @@ pub(crate) fn scorer<'a>(cfg: &'a SearchConfig, index: &'a StrikeIndex, audio: &
         min_strikes: cfg.min_strikes,
         robust_lags: if cfg.kind == ModelKind::Improved { cfg.robust_lags } else { 0 },
         free_amp: None,
+        doa: audio.lags.as_ref().filter(|_| cfg.kind == ModelKind::Improved && cfg.use_stereo),
         n_eff: n_eff * cfg.n_eff_factor,
     }
 }

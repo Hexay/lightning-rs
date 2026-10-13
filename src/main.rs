@@ -27,6 +27,10 @@ enum Cmd {
         /// UTC date the recording was made (YYYY-MM-DD); time of day is searched.
         #[arg(long)]
         date: String,
+        /// Known recording start of the audio, HH:MM:SS[.sss] UTC; searched ±0.5 s.
+        /// Gotcha: video flash times give the frame clock, which can be seconds off the audio track.
+        #[arg(long)]
+        start: Option<String>,
         #[command(flatten)]
         model: ModelArgs,
         #[arg(long, default_value = "out/run")]
@@ -57,6 +61,12 @@ enum Cmd {
         cars: usize,
         #[arg(long, default_value_t = 1)]
         seed: u64,
+        /// Two-mic spacing in metres (0 = mono output).
+        #[arg(long, default_value_t = 0.0)]
+        mic_spacing: f64,
+        /// Compass bearing of the mic axis (right → left mic).
+        #[arg(long, default_value_t = 0.0)]
+        mic_axis: f64,
         #[arg(long)]
         out: PathBuf,
     },
@@ -104,6 +114,8 @@ impl ModelArgs {
 }
 
 const CACHE_DIR: &str = "data/frost";
+/// Search half-width around a supplied --start (video frame timing is ~0.03 s; this covers clock slop).
+const KNOWN_START_TOL_S: f64 = 0.5;
 
 fn main() -> Result<()> {
     let _ = dotenvy::dotenv();
@@ -113,19 +125,18 @@ fn main() -> Result<()> {
             let n = strikes::frost::load_range(day, day + 86400.0, CACHE_DIR.as_ref())?.len();
             println!("{n} strikes on {date}");
         }
-        Cmd::Locate { audio, date, model, out } => locate(&audio, &date, &model, &out)?,
-        Cmd::Sim { date, lat, lon, start, duration, temp, wind_e, wind_n, noise, cars, seed, out } => {
+        Cmd::Locate { audio, date, start, model, out } => locate(&audio, &date, start.as_deref(), &model, &out)?,
+        Cmd::Sim { date, lat, lon, start, duration, temp, wind_e, wind_n, noise, cars, seed, mic_spacing, mic_axis, out } => {
             let day = geo::parse_date(&date)?;
-            let hms: Vec<f64> = start.split(':').map(str::parse).collect::<Result<_, _>>()?;
-            anyhow::ensure!(hms.len() == 3, "--start must be HH:MM:SS");
             let sc = sim::Scenario {
                 listener: geo::LatLon::new(lat, lon),
-                start: day + hms[0] * 3600.0 + hms[1] * 60.0 + hms[2],
+                start: geo::parse_hms(day, &start)?,
                 duration_s: duration,
                 atm: model::params::Atmosphere::from_temp(temp, wind_e, wind_n),
                 noise_level: noise,
                 car_passes: cars,
                 seed,
+                mics: (mic_spacing > 0.0).then_some(sim::Mics { spacing_m: mic_spacing, axis_deg: mic_axis }),
             };
             let strikes = strikes::frost::load_range(day, day + 86400.0, CACHE_DIR.as_ref())?;
             std::fs::create_dir_all(&out)?;
@@ -153,24 +164,33 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn locate(audio_path: &std::path::Path, date: &str, args: &ModelArgs, out: &std::path::Path) -> Result<()> {
+fn locate(audio_path: &std::path::Path, date: &str, start: Option<&str>, args: &ModelArgs, out: &std::path::Path) -> Result<()> {
     let model = args.model;
     let t0 = Instant::now();
     let day = geo::parse_date(date)?;
     let index = strikes::StrikeIndex::new(strikes::frost::load_range(day, day + 86400.0, CACHE_DIR.as_ref())?);
     let audio = audio::load_band(audio_path, 20.0, 250.0)?;
     eprintln!(
-        "{} strikes, {:.1} s audio, model {model:?} (load {:.1}s)",
+        "{} strikes, {:.1} s audio ({}), model {model:?} (load {:.1}s)",
         index.strikes.len(),
         audio.duration_s,
+        audio.lags.as_ref().map_or("mono".into(), |t| format!("stereo, {} usable lag windows", t.samples.len())),
         t0.elapsed().as_secs_f64()
     );
     let cfg = args.config()?;
-    let result = search::pipeline::run(&cfg, &index, &audio, (day, day + 86400.0));
+    let window = match start {
+        Some(s) => {
+            let s = geo::parse_hms(day, s)?;
+            (s - KNOWN_START_TOL_S, s + KNOWN_START_TOL_S + audio.duration_s)
+        }
+        None => (day, day + 86400.0),
+    };
+    let result = search::pipeline::run(&cfg, &index, &audio, window);
     let run_info = json!({
         "model": format!("{model:?}").to_lowercase(),
         "audio": audio_path.file_name().map(|f| f.to_string_lossy().to_string()),
         "date": date,
+        "known_start": start,
         "elapsed_s": t0.elapsed().as_secs_f64(),
         "stages": [cfg.coarse, cfg.mid, cfg.fine],
         "physics": cfg.phys,
@@ -185,7 +205,7 @@ fn locate(audio_path: &std::path::Path, date: &str, args: &ModelArgs, out: &std:
     }
     for r in &result.regions {
         println!(
-            "#{} {:.5},{:.5}  P {:.1}%  rho {:.3}  start {}  c {:.1}  cr90 {:.2} km²",
+            "#{} {:.5},{:.5}  P {:.1}%  rho {:.3}  start {}  c {:.1}  cr90 {:.2} km²  heard {}{}",
             r.rank + 1,
             r.map.lat,
             r.map.lon,
@@ -193,7 +213,9 @@ fn locate(audio_path: &std::path::Path, date: &str, args: &ModelArgs, out: &std:
             r.score.best_rho,
             r.start_utc,
             r.atmosphere.c_mps,
-            r.cr90_area_km2
+            r.cr90_area_km2,
+            r.shape.audible_strikes,
+            if r.shape.reliable() { "" } else { "  [UNRELIABLE: too few strikes heard]" }
         );
     }
     eprintln!("wrote {} in {:.1}s total", out.display(), t0.elapsed().as_secs_f64());

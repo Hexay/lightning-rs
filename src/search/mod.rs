@@ -1,3 +1,4 @@
+pub mod doa;
 pub mod feature;
 pub mod free_amp;
 pub mod grid;
@@ -7,3 +8,4 @@ pub mod probe;
 pub mod robust;
 pub mod scorer;
 pub mod select;
+pub mod shape;

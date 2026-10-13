@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn stepped_tail_matches_exact_emg() {
-        let a = Arrival { onset: 10.0, decay_s: 2.0, sigma_s: 0.3, area: 1.0, audible: true };
+        let a = Arrival { onset: 10.0, decay_s: 2.0, sigma_s: 0.3, area: 1.0, audible: true, bearing_rad: 0.0 };
         let (rate, smooth) = (10.0, 0.5);
         let mut out = Rendered::default();
         render(&[a], 0.0, rate, 400, smooth, 1.0, &mut out);

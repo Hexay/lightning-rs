@@ -42,7 +42,17 @@ pub fn feature_collection(cells: &[ScoredCell], regions: &[Region], onsets: &[On
                 "wind_e_mps": r.atmosphere.wind_e_mps,
                 "wind_n_mps": r.atmosphere.wind_n_mps,
                 "cr90_area_km2": r.cr90_area_km2,
+                "shape": r.shape,
+                "reliable": r.shape.reliable(),
             }
+        })
+    }));
+    features.extend(regions.iter().map(|r| {
+        let ring: Vec<[f64; 2]> = r.shape.ellipse_ring(48).iter().map(|p| [p.lon, p.lat]).collect();
+        json!({
+            "type": "Feature",
+            "geometry": { "type": "Polygon", "coordinates": [ring] },
+            "properties": { "kind": "ellipse", "rank": r.rank + 1 }
         })
     }));
     features.extend(onsets.iter().map(|s| {

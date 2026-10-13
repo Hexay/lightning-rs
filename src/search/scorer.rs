@@ -3,6 +3,8 @@ use super::free_amp::{FreeAmp, refit};
 use std::time::Instant;
 use super::ncc::{Scratch, Template};
 use super::robust::robust_rho;
+use super::doa;
+use crate::audio::stereo::LagTrack;
 use crate::geo::LatLon;
 use crate::model::params::{Atmosphere, ModelKind, Physics};
 use crate::model::propagation::{Arrival, arrival};
@@ -25,6 +27,8 @@ pub struct PointScore {
     /// Epoch seconds the recording most likely started.
     pub best_start: f64,
     pub strikes_in_window: u32,
+    /// Stereo direction evidence at the best start (nats, included in `log_ev`).
+    pub doa_ll: f64,
 }
 
 pub struct Scorer<'a> {
@@ -41,6 +45,8 @@ pub struct Scorer<'a> {
     pub robust_lags: usize,
     /// Per-strike loudness refit at the top lags (envelope feature only).
     pub free_amp: Option<FreeAmp>,
+    /// Stereo lag track; adds direction evidence when present.
+    pub doa: Option<&'a LagTrack>,
     /// Effective independent samples in the clip; scales correlation into log-likelihood.
     pub n_eff: f64,
 }
@@ -117,9 +123,20 @@ impl Scorer<'_> {
         prefix_sums(m, &mut ws.p1, &mut ws.p2);
         self.template.correlate(m, &ws.p1, &mut ws.ncc);
         lap(ws, 2);
-        let s = self.reduce(origin, ws);
+        let mut s = self.reduce(origin, ws);
+        if let Some(track) = self.doa.filter(|_| s.best_rho > 0.0) {
+            s.doa_ll = doa::log_lik(&track.samples, track.window_s, &ws.arrivals, s.best_start);
+            s.log_ev += s.doa_ll;
+        }
         lap(ws, 3);
         s
+    }
+
+    /// Coarse/mid selection key: peak-correlation log-likelihood plus direction evidence
+    /// (same order as `best_rho` for mono audio).
+    pub fn select_key(&self, s: &PointScore) -> f64 {
+        let rho = (s.best_rho as f64).clamp(0.0, 0.999);
+        -0.5 * self.n_eff * (1.0 - rho * rho).ln() + s.doa_ll
     }
 
     /// Diagnostic: the rendered model over the clip window starting at `start_range.0`.

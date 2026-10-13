@@ -1,0 +1,2 @@
+# Add stereo direction evidence (off by default).
+use_stereo = true

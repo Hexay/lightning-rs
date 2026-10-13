@@ -32,6 +32,8 @@ impl Atmosphere {
 pub struct Physics {
     pub cg_top_km: f64,
     pub cg_amp_alt_km: f64,
+    /// Effective height the CG envelope onset is timed from (0 = channel base).
+    pub cg_onset_alt_km: f64,
     pub ic_alt_km: f64,
     pub ic_half_len_km: f64,
     pub ic_gain: f64,
@@ -52,6 +54,7 @@ impl Default for Physics {
         Self {
             cg_top_km: 5.0,
             cg_amp_alt_km: 1.5,
+            cg_onset_alt_km: 0.0,
             ic_alt_km: 7.0,
             ic_half_len_km: 1.0,
             ic_gain: 0.5,
