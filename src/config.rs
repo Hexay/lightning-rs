@@ -1,6 +1,7 @@
 use crate::model::params::{Atmosphere, ModelKind, Physics};
 use crate::search::pipeline::SearchConfig;
 use crate::search::feature::Feature;
+use crate::search::free_amp::FreeAmp;
 use crate::search::scorer::Stage;
 use std::path::Path;
 
@@ -32,6 +33,7 @@ overrides! {
     fine_half_km: f64,
     robust_lags: usize,
     nuisance: Vec<Atmosphere>,
+    free_amp: Option<FreeAmp>,
 }
 
 pub fn search_config(kind: ModelKind, overrides: Option<&Path>) -> anyhow::Result<SearchConfig> {
@@ -63,6 +65,7 @@ fn defaults(kind: ModelKind) -> SearchConfig {
         feature: Feature::Envelope,
         // Off: on the sim tier and real clip it lifted false candidates as much as the truth (no gain).
         robust_lags: 0,
+        free_amp: None,
     }
 }
 

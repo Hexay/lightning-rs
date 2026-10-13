@@ -1,4 +1,5 @@
 pub mod feature;
+pub mod free_amp;
 pub mod grid;
 pub mod ncc;
 pub mod pipeline;

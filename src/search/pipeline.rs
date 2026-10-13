@@ -1,4 +1,5 @@
 use super::feature::Feature;
+use super::free_amp::FreeAmp;
 use super::grid::{self, Cell};
 use super::ncc::Template;
 use super::scorer::{PointScore, Scorer, Stage, Workspace};
@@ -32,6 +33,8 @@ pub struct SearchConfig {
     pub n_eff_factor: f64,
     pub feature: Feature,
     pub robust_lags: usize,
+    /// Fine-stage per-strike loudness refit (improved model, envelope feature).
+    pub free_amp: Option<FreeAmp>,
 }
 
 #[derive(Serialize)]
@@ -98,7 +101,10 @@ pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64
     let mut regions = Vec::new();
     for (r, (center, start)) in fine_seeds.into_iter().enumerate() {
         let range = (start - cfg.fine_time_margin_s, start + cfg.fine_time_margin_s);
-        let fine_scorer = scorer(cfg, index, audio, cfg.fine, range);
+        let mut fine_scorer = scorer(cfg, index, audio, cfg.fine, range);
+        if cfg.kind == ModelKind::Improved && cfg.feature() == Feature::Envelope {
+            fine_scorer.free_amp = cfg.free_amp;
+        }
         let cells = grid::around(center, cfg.fine_half_km, cfg.fine.spacing_km);
         let (scores, atms) = score_cells_marginal(&fine_scorer, &cells, &nuisance);
         let first = out.len();
@@ -141,6 +147,7 @@ pub(crate) fn scorer<'a>(cfg: &'a SearchConfig, index: &'a StrikeIndex, audio: &
         start_range: range,
         min_strikes: cfg.min_strikes,
         robust_lags: if cfg.kind == ModelKind::Improved { cfg.robust_lags } else { 0 },
+        free_amp: None,
         n_eff: n_eff * cfg.n_eff_factor,
     }
 }

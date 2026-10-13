@@ -1,11 +1,12 @@
 use super::feature::Feature;
+use super::free_amp::{FreeAmp, refit};
 use std::time::Instant;
 use super::ncc::{Scratch, Template};
 use super::robust::robust_rho;
 use crate::geo::LatLon;
 use crate::model::params::{Atmosphere, ModelKind, Physics};
 use crate::model::propagation::{Arrival, arrival};
-use crate::model::render::{Rendered, render};
+use crate::model::render::{Kernel, Rendered, render, render_kernels};
 use crate::strikes::StrikeIndex;
 
 /// Resolution settings for one coarse-to-fine stage.
@@ -38,6 +39,8 @@ pub struct Scorer<'a> {
     pub min_strikes: usize,
     /// Top lags re-scored with the outlier-robust fit (0 = plain correlation only).
     pub robust_lags: usize,
+    /// Per-strike loudness refit at the top lags (envelope feature only).
+    pub free_amp: Option<FreeAmp>,
     /// Effective independent samples in the clip; scales correlation into log-likelihood.
     pub n_eff: f64,
 }
@@ -57,6 +60,9 @@ pub struct Workspace {
     count: Vec<u32>,
     lls: Vec<f64>,
     robust_scratch: Vec<f64>,
+    kernels: Vec<Kernel>,
+    /// Prior penalty (nats) paid by a lag's loudness refit; 0 where none ran.
+    penalty: Vec<f64>,
     /// Cumulative seconds in [query+arrivals, render, prefix+correlate, reduce].
     pub phase_s: [f64; 4],
 }
@@ -98,6 +104,9 @@ impl Scorer<'_> {
         let len = ((self.start_range.1 - origin) * rate).ceil() as usize + self.template.len;
         let exponent = if self.kind == ModelKind::Improved { self.phys.render_exponent() } else { 1.0 };
         render(&ws.arrivals, origin, rate, len, self.stage.smooth_s, exponent, &mut ws.rendered);
+        if self.free_amp.is_some() {
+            render_kernels(&ws.arrivals, origin, rate, len, self.stage.smooth_s, &mut ws.kernels);
+        }
         self.feature.apply(&mut ws.rendered.samples, rate, self.stage.smooth_s);
         lap(ws, 1);
         if ws.rendered.onset_idx.len() < self.min_strikes {
@@ -125,6 +134,11 @@ impl Scorer<'_> {
         if self.robust_lags > 0 {
             self.rescore_peaks(ws);
         }
+        ws.penalty.clear();
+        ws.penalty.resize(ws.rho.len(), 0.0);
+        if let Some(fa) = self.free_amp {
+            self.refit_peaks(ws, fa);
+        }
         let mut best = PointScore::default();
         ws.lls.clear();
         for (k, &rho) in ws.rho.iter().enumerate() {
@@ -132,7 +146,7 @@ impl Scorer<'_> {
                 continue;
             }
             let rho = (rho as f64).clamp(0.0, 0.999);
-            ws.lls.push(-0.5 * self.n_eff * (1.0 - rho * rho).ln());
+            ws.lls.push(-0.5 * self.n_eff * (1.0 - rho * rho).ln() - ws.penalty[k]);
             if rho as f32 > best.best_rho {
                 best.best_rho = rho as f32;
                 best.best_start = origin + k as f64 / self.stage.rate_hz;
@@ -166,21 +180,37 @@ impl Scorer<'_> {
         }
     }
 
-    /// Replaces the correlation at the top few separated lags with the outlier-robust fit.
-    fn rescore_peaks(&self, ws: &mut Workspace) {
-        let l = self.template.len;
+    /// The `count` best lags, at least two smoothing widths apart.
+    fn top_lags(&self, rho: &[f32], count: usize) -> Vec<usize> {
         let sep = ((2.0 * self.stage.smooth_s * self.stage.rate_hz) as usize).max(1);
-        let mut chosen: Vec<usize> = Vec::with_capacity(self.robust_lags);
-        for _ in 0..self.robust_lags {
-            let pick = (0..ws.rho.len())
-                .filter(|&k| !ws.rho[k].is_nan() && chosen.iter().all(|&c| c.abs_diff(k) >= sep))
-                .max_by(|&a, &b| ws.rho[a].total_cmp(&ws.rho[b]));
+        let mut chosen: Vec<usize> = Vec::with_capacity(count);
+        for _ in 0..count {
+            let pick = (0..rho.len())
+                .filter(|&k| !rho[k].is_nan() && chosen.iter().all(|&c| c.abs_diff(k) >= sep))
+                .max_by(|&a, &b| rho[a].total_cmp(&rho[b]));
             let Some(k) = pick else { break };
             chosen.push(k);
         }
-        for k in chosen {
+        chosen
+    }
+
+    /// Replaces the correlation at the top few separated lags with the outlier-robust fit.
+    fn rescore_peaks(&self, ws: &mut Workspace) {
+        let l = self.template.len;
+        for k in self.top_lags(&ws.rho, self.robust_lags) {
             let x = &ws.rendered.samples[k..k + l];
             ws.rho[k] = robust_rho(x, &self.template.values, &mut ws.robust_scratch) as f32;
+        }
+    }
+
+    /// Replaces the correlation at the top lags with the per-strike loudness refit (see free_amp.rs).
+    fn refit_peaks(&self, ws: &mut Workspace, fa: FreeAmp) {
+        let exponent = self.phys.render_exponent();
+        for k in self.top_lags(&ws.rho, fa.lags) {
+            if let Some(r) = refit(&self.template.values, k, &ws.kernels, exponent, self.n_eff, fa) {
+                ws.rho[k] = r.rho as f32;
+                ws.penalty[k] = r.penalty;
+            }
         }
     }
 }
