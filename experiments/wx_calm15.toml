@@ -1,0 +1,2 @@
+# Single calm 15 °C atmosphere: the no-weather reference.
+nuisance = [{ c_mps = 340.3, wind_e_mps = 0.0, wind_n_mps = 0.0 }]

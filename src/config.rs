@@ -31,6 +31,7 @@ overrides! {
     mid_half_km: f64,
     fine_half_km: f64,
     robust_lags: usize,
+    nuisance: Vec<Atmosphere>,
 }
 
 pub fn search_config(kind: ModelKind, overrides: Option<&Path>) -> anyhow::Result<SearchConfig> {
