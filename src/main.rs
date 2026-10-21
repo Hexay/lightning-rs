@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 #[derive(Parser)]
-#[command(about = "Locate a recording from the thunder in it, using lightning detection data")]
+#[command(version, about = "Locate a recording from the thunder in it, using lightning detection data")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
