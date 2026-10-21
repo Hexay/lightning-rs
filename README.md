@@ -5,13 +5,17 @@
 
 Work out where and when an audio recording was made using only the thunder in it.
 
+![lightning-rs viewer: posterior heatmap and 90% ellipse on a topo map, above modeled vs observed thunder envelopes and a spectrogram](assets/screenshot.jpg)
+
 Lightning networks log every strike with millisecond timing and positions accurate to a few hundred metres.
 Each strike's thunder reaches a listener after a delay set by distance. A recording of a storm therefore
 carries the listener's position, as the delay pattern across dozens of strikes. lightning-rs searches a
 day of strikes from [MET Norway's Frost API](https://frost.met.no) for the place and start time whose
 predicted thunder best matches the recording. It outputs a probability map with a 90% credible region.
 
-The output is a self-contained HTML map: a heatmap, ranked candidate regions and their 90% ellipses.
+The output is a self-contained HTML page, shown above for a real 4-minute recording from northern Norway. The map
+shows the posterior heatmap and the best candidate with its 90% ellipse. The panel below it plots modeled (red) against
+observed (blue) thunder over UTC time, above a spectrogram of the clip.
 
 ## Install
 
