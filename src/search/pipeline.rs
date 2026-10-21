@@ -60,6 +60,8 @@ pub struct Region {
     pub atmosphere: Atmosphere,
     pub cr90_area_km2: f64,
     pub region_prob: f64,
+    /// Enough strikes were audible here for a trustworthy fix; see `Shape::reliable`.
+    pub reliable: bool,
     pub shape: Shape,
 }
 
@@ -132,6 +134,7 @@ pub fn run(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64
             atmosphere: atms[map_i],
             cr90_area_km2: area,
             region_prob: 0.0,
+            reliable: shape.reliable(),
             shape,
         });
     }

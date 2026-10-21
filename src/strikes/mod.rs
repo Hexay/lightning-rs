@@ -1,8 +1,23 @@
+pub mod csv;
 pub mod frost;
 pub mod ualf;
 
 use crate::geo::{LatLon, km_per_deg_lat, km_per_deg_lon};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+/// Frost day cache: `$LIGHTNING_RS_CACHE` if set, else `data/frost` under the working directory.
+pub fn cache_dir() -> PathBuf {
+    std::env::var_os("LIGHTNING_RS_CACHE").map_or_else(|| PathBuf::from("data/frost"), PathBuf::from)
+}
+
+/// Strikes in [start, end) from a user CSV if given, else from Frost (downloaded and cached).
+pub fn load_range(start: f64, end: f64, csv: Option<&Path>) -> anyhow::Result<Vec<Strike>> {
+    match csv {
+        Some(p) => Ok(csv::load(p)?.into_iter().filter(|s| s.time >= start && s.time < end).collect()),
+        None => frost::load_range(start, end, &cache_dir()),
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Strike {

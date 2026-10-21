@@ -33,6 +33,8 @@ enum Cmd {
         start: Option<String>,
         #[command(flatten)]
         model: ModelArgs,
+        #[command(flatten)]
+        source: StrikeArgs,
         #[arg(long, default_value = "out/run")]
         out: PathBuf,
     },
@@ -73,6 +75,8 @@ enum Cmd {
         /// Compass bearing of the mic axis (right → left mic).
         #[arg(long, default_value_t = 0.0)]
         mic_axis: f64,
+        #[command(flatten)]
+        source: StrikeArgs,
         #[arg(long)]
         out: PathBuf,
     },
@@ -94,6 +98,8 @@ enum Cmd {
         bench: bool,
         #[command(flatten)]
         model: ModelArgs,
+        #[command(flatten)]
+        source: StrikeArgs,
     },
     /// Compare a finished run against a held-out truth file.
     Eval {
@@ -119,7 +125,19 @@ impl ModelArgs {
     }
 }
 
-const CACHE_DIR: &str = "data/frost";
+#[derive(clap::Args)]
+struct StrikeArgs {
+    /// Strike CSV (time, lat, lon[, peak_ka, cloud, error_km]) instead of Frost; see README.
+    #[arg(long)]
+    strikes: Option<PathBuf>,
+}
+
+impl StrikeArgs {
+    fn load_day(&self, day: f64) -> Result<Vec<strikes::Strike>> {
+        strikes::load_range(day, day + 86400.0, self.strikes.as_deref())
+    }
+}
+
 /// Search half-width around a supplied --start (video frame timing is ~0.03 s; this covers clock slop).
 const KNOWN_START_TOL_S: f64 = 0.5;
 
@@ -128,11 +146,11 @@ fn main() -> Result<()> {
     match Cli::parse().cmd {
         Cmd::Fetch { date } => {
             let day = geo::parse_date(&date)?;
-            let n = strikes::frost::load_range(day, day + 86400.0, CACHE_DIR.as_ref())?.len();
+            let n = strikes::load_range(day, day + 86400.0, None)?.len();
             println!("{n} strikes on {date}");
         }
-        Cmd::Locate { audio, date, start, model, out } => locate(&audio, &date, start.as_deref(), &model, &out)?,
-        Cmd::Sim { date, lat, lon, start, duration, temp, wind_e, wind_n, lapse, cg_quiet_below, noise, cars, seed, mic_spacing, mic_axis, out } => {
+        Cmd::Locate { audio, date, start, model, source, out } => locate(&audio, &date, start.as_deref(), &model, &source, &out)?,
+        Cmd::Sim { date, lat, lon, start, duration, temp, wind_e, wind_n, lapse, cg_quiet_below, noise, cars, seed, mic_spacing, mic_axis, source, out } => {
             let day = geo::parse_date(&date)?;
             let sc = sim::Scenario {
                 listener: geo::LatLon::new(lat, lon),
@@ -145,7 +163,7 @@ fn main() -> Result<()> {
                 mics: (mic_spacing > 0.0).then_some(sim::Mics { spacing_m: mic_spacing, axis_deg: mic_axis }),
                 cg_quiet_below_km: cg_quiet_below,
             };
-            let strikes = strikes::frost::load_range(day, day + 86400.0, CACHE_DIR.as_ref())?;
+            let strikes = source.load_day(day)?;
             std::fs::create_dir_all(&out)?;
             sim::write_wav(&out.join("audio.wav"), &sim::synthesize(&strikes, &sc))?;
             let truth = format!(
@@ -155,9 +173,9 @@ fn main() -> Result<()> {
             std::fs::write(out.join("truth.toml"), truth)?;
             println!("wrote {}", out.display());
         }
-        Cmd::Probe { audio, date, lat, lon, start, bench, model } => {
+        Cmd::Probe { audio, date, lat, lon, start, bench, model, source } => {
             let day = geo::parse_date(&date)?;
-            let index = strikes::StrikeIndex::new(strikes::frost::load_range(day, day + 86400.0, CACHE_DIR.as_ref())?);
+            let index = strikes::StrikeIndex::new(source.load_day(day)?);
             let audio = audio::load_band(&audio, 20.0, 250.0)?;
             let (cfg, p, day) = (model.config()?, geo::LatLon::new(lat, lon), (day, day + 86400.0));
             if bench {
@@ -173,11 +191,12 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn locate(audio_path: &std::path::Path, date: &str, start: Option<&str>, args: &ModelArgs, out: &std::path::Path) -> Result<()> {
+fn locate(audio_path: &std::path::Path, date: &str, start: Option<&str>, args: &ModelArgs, source: &StrikeArgs, out: &std::path::Path) -> Result<()> {
     let model = args.model;
     let t0 = Instant::now();
     let day = geo::parse_date(date)?;
-    let index = strikes::StrikeIndex::new(strikes::frost::load_range(day, day + 86400.0, CACHE_DIR.as_ref())?);
+    let index = strikes::StrikeIndex::new(source.load_day(day)?);
+    anyhow::ensure!(!index.strikes.is_empty(), "no strikes on {date}");
     let audio = audio::load_band(audio_path, 20.0, 250.0)?;
     eprintln!(
         "{} strikes, {:.1} s audio ({}), model {model:?} (load {:.1}s)",

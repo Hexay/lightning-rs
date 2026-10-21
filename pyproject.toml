@@ -1,0 +1,28 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "lightning-rs"
+description = "Locate where and when an audio recording was made from the thunder in it"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = ["geolocation", "thunder", "lightning", "acoustics", "osint"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/Hexay/lightning-rs"
+
+[tool.maturin]
+bindings = "bin"
+python-source = "python"
+module-name = "lightning_rs"
+strip = true

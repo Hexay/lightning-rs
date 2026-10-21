@@ -50,6 +50,34 @@ $B eval --run out/demo --truth data/sim/demo/truth.toml
 `eval` should report an error of about 0.4 km. Open `out/demo/index.html` to see the map, with modeled and
 observed thunder and a spectrogram underneath it. Lightning for each UTC day is downloaded once and cached in `data/frost/`.
 
+## Python
+
+```sh
+pip install lightning-rs
+```
+
+The wheel bundles the compiled binary, so Rust isn't needed. ffmpeg still has to be on `PATH`.
+
+```python
+import lightning_rs as lr
+
+res = lr.locate("storm.opus", "2025-07-19", frost_client_id="...")  # or set FROST_CLIENT_ID
+res.best            # Region(rank=1, lat=65.659, lon=14.117, start=datetime(...), reliable=True, ...)
+res.regions         # all candidates, best first
+env = res.envelope()        # .times (UTC datetimes), .observed, .modeled
+res.spectrogram             # .freqs_hz, .offsets_s, .power[band][frame]
+res.viewer                  # path to the interactive HTML map
+res.geopackage              # path to result.gpkg for ArcGIS / QGIS (geopandas.read_file(res.geopackage, layer="cells"))
+
+# Your own lightning data: a CSV path, a list of dicts, or a pandas DataFrame
+res = lr.locate("storm.opus", "2023-06-02", strikes=df)  # columns: time, lat, lon[, peak_ka, cloud, error_km]
+
+lr.simulate("2025-07-19", 65.089, 19.339, "14:40:30", "sim/", temp=12, seed=25)  # synthetic test clip
+lr.load("out/run")          # re-read a previous run
+```
+
+Frost downloads are cached in the user cache directory. To use a different location, set `LIGHTNING_RS_CACHE`.
+
 ## Usage
 
 | Command | What it does |
@@ -60,11 +88,30 @@ observed thunder and a spectrogram underneath it. Lightning for each UTC day is 
 | `fetch --date D` | Downloads and caches one day of Frost lightning ahead of time. |
 | `probe ...` | Diagnostics: scores one point at every pipeline stage. |
 
-`locate` writes three files to `--out` (default `out/run`):
+`locate`, `sim` and `probe` take `--strikes file.csv` to use lightning data from any network instead of Frost:
+
+| Column | Required | Meaning |
+|---|---|---|
+| `time` | yes | UTC, as epoch seconds or ISO-8601 (`2025-07-19T16:00:01.25Z`) |
+| `lat`, `lon` | yes | Strike position, in degrees |
+| `peak_ka` | no | Peak current in kA. Default 10. |
+| `cloud` | no | `1`/`true` for in-cloud, otherwise cloud-to-ground |
+| `error_km` | no | Location error, as a 50% radius. Default 0.5. |
+
+Accuracy depends on the network's timing and position errors. Frost/NORDLIS reaches about 200 m; Blitzortung's
+public feed is about 3 km.
+
+`locate` writes five files to `--out` (default `out/run`):
 
 - `index.html`: the map viewer. Under the map, it plots the modeled and observed thunder envelopes over UTC time, with a 10–1000 Hz spectrogram on the same time axis. Clicking a candidate region switches the modeled curve to that region.
-- `heatmap.geojson`: every scored grid cell
+- `result.gpkg`: a GeoPackage for ArcGIS Pro or QGIS (drag it in), in WGS 84. It has four layers:
+  - `cells`: posterior grid polygons
+  - `candidates`: points
+  - `ellipses`: 90% regions, linked to candidates by `rank`
+  - `onsets`: onset-solve fixes
+- `heatmap.geojson`: the same features in a single GeoJSON file
 - `candidates.json`: ranked regions, each with its start time, fitted atmosphere, 90% area and a `reliable` flag
+- `trace.json`: the envelope curves and spectrogram shown in the viewer
 
 ### Models and overrides
 
@@ -100,7 +147,7 @@ Two physical findings drove the model. Both are written up in [`research/`](rese
 
 Limitations:
 
-- **Coverage.** Frost lightning covers the Nordic detection network (Norway and neighbouring countries) and nothing else.
+- **Coverage.** Frost lightning covers the Nordic detection network (Norway and neighbouring countries) and nothing else. For anywhere else, use `--strikes` with data from another network.
 - **Recording length.** You need several minutes of unedited audio recorded inside an active storm. Short or edited clips don't hear enough strikes to fix a position.
 - **Geometry.** If every strike comes from one direction, the result is a stretched ellipse. Strikes from several directions give a tight fix.
 - **Video clocks.** In a video, the visible flashes give the frame clock. The audio track can be seconds away from that, so `--start` taken from flashes needs care.

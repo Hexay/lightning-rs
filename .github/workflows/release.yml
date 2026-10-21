@@ -1,0 +1,61 @@
+# Builds the CLI into Python wheels (maturin `bin` bindings) and publishes to PyPI on a version tag.
+# Based on `maturin generate-ci github`. PyPI side: add this repo/workflow/environment as a trusted publisher.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - { runner: ubuntu-22.04, target: x86_64, manylinux: auto }
+          - { runner: ubuntu-22.04, target: aarch64, manylinux: auto }
+          - { runner: windows-latest, target: x64 }
+          - { runner: macos-15-intel, target: x86_64 }
+          - { runner: macos-latest, target: aarch64 }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          manylinux: ${{ matrix.manylinux }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-${{ matrix.runner }}-${{ matrix.target }}
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-sdist
+          path: dist
+
+  publish:
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v7
+      - uses: actions/attest@v4
+        with:
+          subject-path: 'wheels-*/*'
+      - uses: astral-sh/setup-uv@v7
+      - run: uv publish --trusted-publishing always 'wheels-*/*'
