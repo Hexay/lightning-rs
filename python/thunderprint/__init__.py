@@ -1,7 +1,7 @@
 """Locate where and when a recording was made from the thunder in it.
 
-    import lightning_rs as lr
-    res = lr.locate("storm.opus", "2025-07-19")
+    import thunderprint as tp
+    res = tp.locate("storm.opus", "2025-07-19")
     print(res.best)          # Region(rank=1, lat=..., lon=..., start=..., reliable=True, ...)
     env = res.envelope()     # observed vs modelled thunder over UTC time
     res.viewer               # path to the interactive HTML map
@@ -19,10 +19,10 @@ from datetime import date as _date, datetime, time as _time, timezone
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from ._cli import LightningError, run
+from ._cli import ThunderprintError, run
 from .results import Envelope, Region, Result, Spectrogram, load
 
-__all__ = ["locate", "simulate", "fetch", "load", "Result", "Region", "Envelope", "Spectrogram", "LightningError"]
+__all__ = ["locate", "simulate", "fetch", "load", "Result", "Region", "Envelope", "Spectrogram", "ThunderprintError"]
 
 STRIKE_COLUMNS = ("time", "lat", "lon", "peak_ka", "cloud", "error_km")
 
@@ -44,7 +44,7 @@ def locate(
     `start` (UTC time of day) narrows the search to ±0.5 s when the recording start is known.
     Results are written to `out_dir` (a temp dir if omitted) and returned parsed. Takes minutes.
     """
-    out = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="lightning-rs-"))
+    out = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="thunderprint-"))
     with _strike_file(strikes) as strikes_path:
         args = ["locate", "--audio", str(audio), "--date", _iso_date(date), "--model", model, "--out", str(out)]
         args += _opt("--start", start and _iso_time(start)) + _opt("--overrides", overrides) + _opt("--strikes", strikes_path)
@@ -65,7 +65,7 @@ def simulate(
 ) -> Path:
     """Synthesises a thunder recording at (`lat`, `lon`) from real strikes; returns the audio.wav path.
 
-    `options` map to `lightning-rs sim` flags, e.g. duration=260, temp=14, wind_e=0, noise=0.02, seed=1.
+    `options` map to `thunderprint sim` flags, e.g. duration=260, temp=14, wind_e=0, noise=0.02, seed=1.
     """
     out = Path(out_dir)
     with _strike_file(strikes) as strikes_path:

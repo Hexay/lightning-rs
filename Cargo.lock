@@ -467,26 +467,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-rs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64",
- "clap",
- "dotenvy",
- "hound",
- "rand",
- "rand_distr",
- "rayon",
- "rusqlite",
- "rustfft",
- "serde",
- "serde_json",
- "toml",
- "ureq",
-]
-
-[[package]]
 name = "litemap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -922,6 +902,26 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "thunderprint"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "clap",
+ "dotenvy",
+ "hound",
+ "rand",
+ "rand_distr",
+ "rayon",
+ "rusqlite",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "toml",
+ "ureq",
 ]
 
 [[package]]

@@ -3,7 +3,7 @@ requires = ["maturin>=1.7,<2"]
 build-backend = "maturin"
 
 [project]
-name = "lightning-rs"
+name = "thunderprint"
 description = "Locate where and when an audio recording was made from the thunder in it"
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,10 +19,10 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
-Repository = "https://github.com/Hexay/lightning-rs"
+Repository = "https://github.com/Hexay/thunderprint"
 
 [tool.maturin]
 bindings = "bin"
 python-source = "python"
-module-name = "lightning_rs"
+module-name = "thunderprint"
 strip = true

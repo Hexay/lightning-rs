@@ -3,7 +3,7 @@
 # their claimed locations. Usage: [OVR=overrides.toml] tools/clips.sh [id-filter]
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-B="$ROOT/target/release/lightning-rs"
+B="$ROOT/target/release/thunderprint"
 cd "$ROOT"
 # id date lat lon
 CLIPS=(

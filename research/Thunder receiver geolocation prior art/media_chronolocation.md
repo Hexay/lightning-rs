@@ -20,7 +20,7 @@ The peer-reviewed reference is Seimon et al. (BAMS 2016), the formal paper behin
 - NLDN detects ≥20 kA return strokes with essentially full efficiency and ~80% for 5–20 kA (Nag et al. 2011, cited in an arXiv TGF paper). This supports El Reno's >20 kA cut. — [arXiv 2308.05662](https://arxiv.org/pdf/2308.05662)
 
 ### Inferences
-- The El Reno matching is an interval-pattern match, which is invariant to the unknown clock offset. It is the optical analogue of lightning-rs's clock-offset scan. The BAMS paper is the citable peer-reviewed precedent for "media clock from a lightning catalogue", where the prior notes had only the website.
+- The El Reno matching is an interval-pattern match, which is invariant to the unknown clock offset. It is the optical analogue of thunderprint's clock-offset scan. The BAMS paper is the citable peer-reviewed precedent for "media clock from a lightning catalogue", where the prior notes had only the website.
 - Restricting to >20 kA strokes is a detection-efficiency guard. A thunder method has the same issue on the catalogue side, since missing strokes give unexplained thunder.
 - No storm-research item found uses thunder or audio for timing or position. All of them use the optical channel plus GPS or visual georeferencing.
 
@@ -73,7 +73,7 @@ No source found that timestamps an audio or video recording by matching sferic c
 ## 4. Physics-based geolocation/chronolocation of media from other natural events
 
 ### Takeaway
-Comparators exist for every channel: crowdsourced video timing of a blast (Beirut, Rigby et al.), many casual videos triangulating a bolide (Chelyabinsk), CCTV footage as a near-fault seismic instrument (Mandalay 2025), and sun/shadow chronolocation as the standard OSINT tool with one quantified automated verifier (IMAGEGUARD). None inverts for an unknown receiver from catalogued events the way lightning-rs does. Each assumes known camera positions and times, or a single known event.
+Comparators exist for every channel: crowdsourced video timing of a blast (Beirut, Rigby et al.), many casual videos triangulating a bolide (Chelyabinsk), CCTV footage as a near-fault seismic instrument (Mandalay 2025), and sun/shadow chronolocation as the standard OSINT tool with one quantified automated verifier (IMAGEGUARD). None inverts for an unknown receiver from catalogued events the way thunderprint does. Each assumes known camera positions and times, or a single known event.
 
 ### Cited Findings
 - **Rigby, S. E. et al. (2020), "Preliminary yield estimation of the 2020 Beirut explosion using video footage from social media," Shock Waves.** 16 videos with line of sight, blast arrival times at 38 positions, distances from Google Earth. Yield best estimate 0.50 kt TNT, upper limit 1.12 kt. Selection required "synchronised audio and video" and identifiable landmarks. Audio and visual arrival data "broadly follow the same trend". — [Springer s00193-020-00970-z](https://link.springer.com/article/10.1007/s00193-020-00970-z); [White Rose eprint](https://eprints.whiterose.ac.uk/165010)
@@ -91,7 +91,7 @@ Comparators exist for every channel: crowdsourced video timing of a blast (Beiru
 - Shadow ambiguity: the same shadow fits a spring and an autumn/winter date. Off-perpendicular views give only a time range. — [Forensic Genealogy](https://forensicgenealogy.info/shadows.html); [cylab.be](https://cylab.be/blog/411/shadow-analysis-1-the-osint-trick-behind-telling-time-from-a-picture)
 
 ### Inferences
-- Beirut is the closest acoustic analogue in method (video audio arrival vs distance) but runs the other way: known camera positions, unknown source yield. lightning-rs has known sources and an unknown receiver.
+- Beirut is the closest acoustic analogue in method (video audio arrival vs distance) but runs the other way: known camera positions, unknown source yield. thunderprint has known sources and an unknown receiver.
 - Sun/shadow and ENF are the established comparators with published accuracy and failure modes. IMAGEGUARD's true/false-accept framing is a good template for reporting a thunder method's validation.
 
 ### Gaps
@@ -115,7 +115,7 @@ SWGDE Best Practices for Digital Audio Authentication (v1.3, 2018) lists ENF as 
 - ENF literature on forensic limits: performance depends most on test-recording length, then reference length (2024). Noise and interference remain open problems (IEEE Access 2017). Methods "perform poorly with variable ENF trace quality" in forensic speech (2018). Grigoras: spectrogram inspection plus database comparison often suffices for a non-authenticity finding. — [Digital Communications and Networks 2024](https://doaj.org/article/dc6cd16fbf334eb7a0616f4e772303f3); [IEEE Access 2017](https://doaj.org/article/2f367839e8cf45d6a9258d57e410829f); [Proc. Romanian Academy 2018](https://acad.ro/sectii2002/proceedings/doc2018-4/art12.pdf); [Grigoras, IJSLL](https://journal.equinoxpub.com/IJSLL/article/view/9977); [Further considerations, IJSLL](https://journal.equinoxpub.com/IJSLL/article/view/5980)
 
 ### Inferences
-- To be forensically admissible-shaped, a thunder method would report a measurement uncertainty, such as a calibrated region or time interval with coverage validated on blind cases. lightning-rs's 90% ellipse plus reliability flag maps onto this. It would also need a categorical conclusion (consistent / inconclusive / inconsistent with a claimed time and place) and corroboration by an independent analysis (ENF, shadows, metadata), not sole reliance.
+- To be forensically admissible-shaped, a thunder method would report a measurement uncertainty, such as a calibrated region or time interval with coverage validated on blind cases. thunderprint's 90% ellipse plus reliability flag maps onto this. It would also need a categorical conclusion (consistent / inconclusive / inconsistent with a claimed time and place) and corroboration by an independent analysis (ENF, shadows, metadata), not sole reliance.
 - The forensic use case most likely to fit is verifying a claim ("recorded at X around T"), as STRIKEnet and ENF do, more than open-ended search.
 
 ### Gaps

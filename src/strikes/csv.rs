@@ -48,7 +48,7 @@ mod tests {
 
     #[test]
     fn parses_minimal_and_full_rows() {
-        let dir = std::env::temp_dir().join("lightning_rs_csv_test.csv");
+        let dir = std::env::temp_dir().join("thunderprint_csv_test.csv");
         std::fs::write(&dir, "time,lat,lon,peak_ka,cloud\n1752940800.5,65.1,14.2,-23.4,0\n2025-07-19T16:00:01.25Z,65.2,14.3,8,1\n").unwrap();
         let s = load(&dir).unwrap();
         assert_eq!(s.len(), 2);

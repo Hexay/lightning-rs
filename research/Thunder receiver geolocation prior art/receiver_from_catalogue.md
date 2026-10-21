@@ -23,7 +23,7 @@ Seismology treats receiver position, orientation and clock as separate inverse p
 - **Probabilistic grid-search location: NonLinLoc.** Lomax, Virieux, Volant & Berge-Thierry (2000), "Probabilistic Earthquake Location in 3D and Layered Models", in *Advances in Seismic Event Location* (Modern Approaches in Geophysics), Springer, doi:10.1007/978-94-015-9536-0_5 (metadata only; I did not read the content). This is the standard seismological grid/sampled posterior-PDF location method. — [doi](https://doi.org/10.1007/978-94-015-9536-0_5)
 
 ### Inferences
-- The Bondár criteria (azimuthal gap, secondary gap, nearest-station distance, count ≥10) translate directly into a reliability flag for lightning-rs, with strikes taking the place of stations. The secondary-gap criterion (gap left after dropping one source) guards against one strike carrying the solution. The current flag is count-only.
+- The Bondár criteria (azimuthal gap, secondary gap, nearest-station distance, count ≥10) translate directly into a reliability flag for thunderprint, with strikes taking the place of stations. The secondary-gap criterion (gap left after dropping one source) guards against one strike carrying the solution. The current flag is count-only.
 - Bondár's finding that formal Gaussian ellipses underestimate true error at high confidence matches this repo's real-vs-sim fit gap. Geometry-based empirical calibration against ground truth, as Bondár did with GT explosions, is the documented remedy.
 - The Apollo 16 case (seismic site ~31 km off) is a cautionary precedent: single-station or sparse-geometry locations from known-time sources can carry large biases. This is consistent with the repo's radial-error findings.
 
@@ -88,7 +88,7 @@ I found no peer-reviewed forensic method that geolocates or timestamps a single 
 ## Q5. Do any analogues use a grid-search likelihood/posterior with credible regions and a reliability/identifiability metric?
 
 ### Takeaway
-Yes, but in pieces, and almost always for the *source* rather than the receiver. NonLinLoc-style grid posteriors with confidence regions are standard for earthquakes. Bondár's geometry criteria are the established reliability metric. Ekström & Busby use a minimum-measurement-count reliability rule for orientation, and OBS relocation uses grid search. None of the receiver-side analogues found here combines all three (a grid posterior over receiver position and clock, a credible region, and a geometry/count reliability flag). That combination in lightning-rs appears undocumented in the literature found.
+Yes, but in pieces, and almost always for the *source* rather than the receiver. NonLinLoc-style grid posteriors with confidence regions are standard for earthquakes. Bondár's geometry criteria are the established reliability metric. Ekström & Busby use a minimum-measurement-count reliability rule for orientation, and OBS relocation uses grid search. None of the receiver-side analogues found here combines all three (a grid posterior over receiver position and clock, a credible region, and a geometry/count reliability flag). That combination in thunderprint appears undocumented in the literature found.
 
 ### Cited Findings
 - Grid/sampled posterior location: Lomax et al. 2000, doi:10.1007/978-94-015-9536-0_5 (metadata only). — [doi](https://doi.org/10.1007/978-94-015-9536-0_5)

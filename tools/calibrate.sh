@@ -3,7 +3,7 @@
 # Usage: tools/calibrate.sh 0.5 0.2 0.1 ...
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/target/release/lightning-rs"
+BIN="$ROOT/target/release/thunderprint"
 mkdir -p "$ROOT/experiments" "$ROOT/out"
 for f in "$@"; do
   ovr="$ROOT/experiments/neff_$f.toml"

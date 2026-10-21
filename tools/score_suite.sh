@@ -4,7 +4,7 @@
 #   suffix "" = out/sim/<case>-improved, "-x" = out/sim/<case>-improved-x
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-B="$ROOT/target/release/lightning-rs"
+B="$ROOT/target/release/thunderprint"
 cd "$ROOT"
 [ $# -eq 0 ] && set -- ""
 printf '%-24s' case; for s in "$@"; do printf '%16s' "improved${s}"; done; echo

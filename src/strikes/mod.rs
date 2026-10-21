@@ -6,9 +6,9 @@ use crate::geo::{LatLon, km_per_deg_lat, km_per_deg_lon};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-/// Frost day cache: `$LIGHTNING_RS_CACHE` if set, else `data/frost` under the working directory.
+/// Frost day cache: `$THUNDERPRINT_CACHE` if set, else `data/frost` under the working directory.
 pub fn cache_dir() -> PathBuf {
-    std::env::var_os("LIGHTNING_RS_CACHE").map_or_else(|| PathBuf::from("data/frost"), PathBuf::from)
+    std::env::var_os("THUNDERPRINT_CACHE").map_or_else(|| PathBuf::from("data/frost"), PathBuf::from)
 }
 
 /// Strikes in [start, end) from a user CSV if given, else from Frost (downloaded and cached).

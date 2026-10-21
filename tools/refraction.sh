@@ -3,7 +3,7 @@
 # Usage: tools/refraction.sh   (results in out/refr/*.log; summary on stdout)
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-B="$ROOT/target/release/lightning-rs"; E="$ROOT/experiments"
+B="$ROOT/target/release/thunderprint"; E="$ROOT/experiments"
 cd "$ROOT"
 for l in 6.5 9.8; do
   d=data/sim/real_twin_lapse$l

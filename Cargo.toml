@@ -1,10 +1,10 @@
 [package]
-name = "lightning-rs"
+name = "thunderprint"
 version = "0.1.0"
 edition = "2024"
 description = "Locate where and when an audio recording was made from the thunder in it, using lightning detection data"
 license = "MIT"
-repository = "https://github.com/Hexay/lightning-rs"
+repository = "https://github.com/Hexay/thunderprint"
 readme = "README.md"
 keywords = ["geolocation", "thunder", "lightning", "acoustics", "osint"]
 categories = ["command-line-utilities", "science", "multimedia::audio"]

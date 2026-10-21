@@ -1,15 +1,15 @@
-# lightning-rs
+# thunderprint
 
-[![CI](https://github.com/Hexay/lightning-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Hexay/lightning-rs/actions/workflows/ci.yml)
+[![CI](https://github.com/Hexay/thunderprint/actions/workflows/ci.yml/badge.svg)](https://github.com/Hexay/thunderprint/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Work out where and when an audio recording was made using only the thunder in it.
 
-![lightning-rs viewer: posterior heatmap and 90% ellipse on a topo map, above modeled vs observed thunder envelopes and a spectrogram](assets/screenshot.jpg)
+![thunderprint viewer: posterior heatmap and 90% ellipse on a topo map, above modeled vs observed thunder envelopes and a spectrogram](assets/screenshot.jpg)
 
 Lightning networks log every strike with millisecond timing and positions accurate to a few hundred metres.
 Each strike's thunder reaches a listener after a delay set by distance. A recording of a storm therefore
-carries the listener's position, as the delay pattern across dozens of strikes. lightning-rs searches a
+carries the listener's position, as the delay pattern across dozens of strikes. thunderprint searches a
 day of strikes from [MET Norway's Frost API](https://frost.met.no) for the place and start time whose
 predicted thunder best matches the recording. It outputs a probability map with a 90% credible region.
 
@@ -32,8 +32,8 @@ Requirements:
 Then build:
 
 ```sh
-git clone https://github.com/Hexay/lightning-rs
-cd lightning-rs
+git clone https://github.com/Hexay/thunderprint
+cd thunderprint
 cargo build --release
 ```
 
@@ -43,7 +43,7 @@ You don't need a real recording to try it. `sim` synthesises thunder from real s
 choose, and you can then check whether `locate` finds that listener:
 
 ```sh
-B=target/release/lightning-rs
+B=target/release/thunderprint
 
 $B sim --date 2025-07-19 --lat 65.089 --lon 19.339 --start 14:40:30 \
   --temp=12 --wind-e=4 --wind-n=4 --noise 0.03 --seed 25 --out data/sim/demo
@@ -57,15 +57,15 @@ observed thunder and a spectrogram underneath it. Lightning for each UTC day is 
 ## Python
 
 ```sh
-pip install lightning-rs
+pip install thunderprint
 ```
 
 The wheel bundles the compiled binary, so Rust isn't needed. ffmpeg still has to be on `PATH`.
 
 ```python
-import lightning_rs as lr
+import thunderprint as tp
 
-res = lr.locate("storm.opus", "2025-07-19", frost_client_id="...")  # or set FROST_CLIENT_ID
+res = tp.locate("storm.opus", "2025-07-19", frost_client_id="...")  # or set FROST_CLIENT_ID
 res.best            # Region(rank=1, lat=65.659, lon=14.117, start=datetime(...), reliable=True, ...)
 res.regions         # all candidates, best first
 env = res.envelope()        # .times (UTC datetimes), .observed, .modeled
@@ -74,13 +74,13 @@ res.viewer                  # path to the interactive HTML map
 res.geopackage              # path to result.gpkg for ArcGIS / QGIS (geopandas.read_file(res.geopackage, layer="cells"))
 
 # Your own lightning data: a CSV path, a list of dicts, or a pandas DataFrame
-res = lr.locate("storm.opus", "2023-06-02", strikes=df)  # columns: time, lat, lon[, peak_ka, cloud, error_km]
+res = tp.locate("storm.opus", "2023-06-02", strikes=df)  # columns: time, lat, lon[, peak_ka, cloud, error_km]
 
-lr.simulate("2025-07-19", 65.089, 19.339, "14:40:30", "sim/", temp=12, seed=25)  # synthetic test clip
-lr.load("out/run")          # re-read a previous run
+tp.simulate("2025-07-19", 65.089, 19.339, "14:40:30", "sim/", temp=12, seed=25)  # synthetic test clip
+tp.load("out/run")          # re-read a previous run
 ```
 
-Frost downloads are cached in the user cache directory. To use a different location, set `LIGHTNING_RS_CACHE`.
+Frost downloads are cached in the user cache directory. To use a different location, set `THUNDERPRINT_CACHE`.
 
 ## Usage
 

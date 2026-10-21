@@ -15,7 +15,7 @@ I found no public code that matches recorded thunder against a lightning catalog
 - Other Blitzortung clients (mrk-its/homeassistant-blitzortung, piRstone/notiblitz, iancharnas/clevelandlightning scraper) fetch strike data or send alerts and do no audio work — [GitHub topic: blitzortung](https://github.com/topics/blitzortung), [clevelandlightning scraper](https://github.com/iancharnas/clevelandlightning/blob/main/scrapeBlitzortungLightningStrikes.py)
 
 ### Inferences
-- lightning-rs still looks like the only public implementation of the colsto-style inverse (single microphone, catalogue strikes, position grid plus clock scan). colsto's pipeline is described as Python but has not been released.
+- thunderprint still looks like the only public implementation of the colsto-style inverse (single microphone, catalogue strikes, position grid plus clock scan). colsto's pipeline is described as Python but has not been released.
 
 ### Gaps
 - GitHub code search needs authentication and returned nothing, so code inside unrelated repos (notebooks, gists) could be missed. I did not search Hugging Face, Kaggle or GitLab.

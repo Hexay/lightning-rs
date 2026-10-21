@@ -3,7 +3,7 @@
 # Usage: tools/quiet_twin.sh "3 5" "7 8"   (quiet-below heights km, seeds)
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-B="$ROOT/target/release/lightning-rs"; E="$ROOT/experiments"
+B="$ROOT/target/release/thunderprint"; E="$ROOT/experiments"
 cd "$ROOT"
 for q in ${1:-3 5}; do for s in ${2:-7}; do
   d=data/sim/real_twin_quiet${q}_s$s

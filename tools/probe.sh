@@ -10,5 +10,5 @@ start=$(grep ^start "$dir/truth.toml" | cut -d' ' -f3)
 ovr=()
 [ -n "${2:-}" ] && ovr=(--overrides "$2")
 cd "$ROOT"
-"$ROOT/target/release/lightning-rs" probe --audio "$dir/audio.wav" --date 2025-07-19 --lat "$lat" --lon "$lon" --start "$start" "${ovr[@]}"
+"$ROOT/target/release/thunderprint" probe --audio "$dir/audio.wav" --date 2025-07-19 --lat "$lat" --lon "$lon" --start "$start" "${ovr[@]}"
 py -3 -I "$ROOT/tools/plot_probe.py" out/probe.csv "out/probe-$1.png" >/dev/null

@@ -1,6 +1,6 @@
 # Empirical thunder response (vid2, 2026-10-13/14)
 
-Method: `tools/deconv_thunder.py`. It regresses the observed envelope (10 Hz probe output at a known spot and start) on per-distance-bin FIR kernels placed at each catalog strike's straight-line arrival d/c, weighted by |kA|/d². Overlapping strikes are handled jointly. Inputs come from `lightning-rs probe --start EPOCH` → out/probe.csv.
+Method: `tools/deconv_thunder.py`. It regresses the observed envelope (10 Hz probe output at a known spot and start) on per-distance-bin FIR kernels placed at each catalog strike's straight-line arrival d/c, weighted by |kA|/d². Overlapping strikes are handled jointly. Inputs come from `thunderprint probe --start EPOCH` → out/probe.csv.
 
 ## Per-bin kernels (vid2 at truth; start 15:59:48.6 fitted at h=0)
 

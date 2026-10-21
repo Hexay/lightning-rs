@@ -1,4 +1,4 @@
-"""Locate and run the bundled `lightning-rs` binary."""
+"""Locate and run the bundled `thunderprint` binary."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ import sys
 import sysconfig
 from pathlib import Path
 
-EXE = "lightning-rs" + (".exe" if sys.platform == "win32" else "")
+EXE = "thunderprint" + (".exe" if sys.platform == "win32" else "")
 
 
-class LightningError(RuntimeError):
-    """The lightning-rs binary exited with an error; `stderr` holds its message."""
+class ThunderprintError(RuntimeError):
+    """The thunderprint binary exited with an error; `stderr` holds its message."""
 
     def __init__(self, args: list[str], stderr: str):
-        super().__init__(f"lightning-rs {' '.join(args[:1])} failed:\n{stderr.strip()}")
+        super().__init__(f"thunderprint {' '.join(args[:1])} failed:\n{stderr.strip()}")
         self.stderr = stderr
 
 
@@ -25,9 +25,9 @@ def binary() -> str:
     for d in (sysconfig.get_path("scripts"), sysconfig.get_path("scripts", f"{os.name}_user")):
         if d and (Path(d) / EXE).is_file():
             return str(Path(d) / EXE)
-    found = shutil.which("lightning-rs")
+    found = shutil.which("thunderprint")
     if not found:
-        raise FileNotFoundError("lightning-rs binary not found; reinstall the package or put it on PATH")
+        raise FileNotFoundError("thunderprint binary not found; reinstall the package or put it on PATH")
     return found
 
 
@@ -38,16 +38,16 @@ def default_cache() -> Path:
         base = Path.home() / "Library" / "Caches"
     else:
         base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
-    return base / "lightning-rs" / "frost"
+    return base / "thunderprint" / "frost"
 
 
 def run(args: list[str], frost_client_id: str | None = None, quiet: bool = True) -> str:
     """Runs the binary with `args`; returns stdout. Progress (stderr) is shown unless `quiet`."""
     env = dict(os.environ)
-    env.setdefault("LIGHTNING_RS_CACHE", str(default_cache()))
+    env.setdefault("THUNDERPRINT_CACHE", str(default_cache()))
     if frost_client_id:
         env["FROST_CLIENT_ID"] = frost_client_id
     proc = subprocess.run([binary(), *args], env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE if quiet else None)
     if proc.returncode != 0:
-        raise LightningError(args, proc.stderr or "")
+        raise ThunderprintError(args, proc.stderr or "")
     return proc.stdout

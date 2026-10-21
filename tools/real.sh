@@ -4,7 +4,7 @@
 # START=15:59:46.43 is the clip start recovered from video flashes matched to Frost strikes.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/target/release/lightning-rs"
+BIN="$ROOT/target/release/thunderprint"
 run() {
   local name="$1"; shift
   local out="$ROOT/out/real-$name${START:+-known}"

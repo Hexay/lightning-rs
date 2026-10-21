@@ -4,7 +4,7 @@
 # MICS synthesises a two-mic (stereo) recording into data/sim/<case>-stereo.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/target/release/lightning-rs"
+BIN="$ROOT/target/release/thunderprint"
 MODELS="${1:-both}"; FILTER="${2:-}"
 [ "$MODELS" = both ] && MODELS="improved baseline"
 

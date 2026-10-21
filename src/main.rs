@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use lightning_rs::model::params::ModelKind;
-use lightning_rs::{audio, config, eval, geo, model, onset, output, search, sim, strikes};
+use thunderprint::model::params::ModelKind;
+use thunderprint::{audio, config, eval, geo, model, onset, output, search, sim, strikes};
 use serde_json::json;
 use std::path::PathBuf;
 use std::time::Instant;
