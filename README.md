@@ -1,6 +1,8 @@
 # thunderprint
 
 [![CI](https://github.com/Hexay/thunderprint/actions/workflows/ci.yml/badge.svg)](https://github.com/Hexay/thunderprint/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/thunderprint.svg)](https://pypi.org/project/thunderprint/)
+[![crates.io](https://img.shields.io/crates/v/thunderprint.svg)](https://crates.io/crates/thunderprint)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Work out where and when an audio recording was made using only the thunder in it.
@@ -19,23 +21,26 @@ observed (blue) thunder over UTC time, above a spectrogram of the clip.
 
 ## Install
 
-Requirements:
+Pick one:
 
-- Rust (stable, edition 2024)
+```sh
+pip install thunderprint     # CLI + Python API, prebuilt for Linux, macOS, Windows
+cargo install thunderprint   # CLI from crates.io
+```
+
+or download a prebuilt binary from [Releases](https://github.com/Hexay/thunderprint/releases).
+
+You also need:
+
 - [`ffmpeg`](https://ffmpeg.org) on `PATH` to decode audio. Any format ffmpeg reads works.
-- A free Frost client ID from [frost.met.no](https://frost.met.no/howto.html), in a `.env` file at the repo root:
+- A free Frost client ID from [frost.met.no](https://frost.met.no/howto.html), set as `FROST_CLIENT_ID` in the
+  environment or in a `.env` file in the working directory:
 
   ```
   FROST_CLIENT_ID=your-client-id
   ```
 
-Then build:
-
-```sh
-git clone https://github.com/Hexay/thunderprint
-cd thunderprint
-cargo build --release
-```
+To build from source (Rust stable, edition 2024): `git clone https://github.com/Hexay/thunderprint && cargo build --release`.
 
 ## Quickstart
 
@@ -43,16 +48,15 @@ You don't need a real recording to try it. `sim` synthesises thunder from real s
 choose, and you can then check whether `locate` finds that listener:
 
 ```sh
-B=target/release/thunderprint
-
-$B sim --date 2025-07-19 --lat 65.089 --lon 19.339 --start 14:40:30 \
+thunderprint sim --date 2025-07-19 --lat 65.089 --lon 19.339 --start 14:40:30 \
   --temp=12 --wind-e=4 --wind-n=4 --noise 0.03 --seed 25 --out data/sim/demo
-$B locate --audio data/sim/demo/audio.wav --date 2025-07-19 --out out/demo
-$B eval --run out/demo --truth data/sim/demo/truth.toml
+thunderprint locate --audio data/sim/demo/audio.wav --date 2025-07-19 --out out/demo
+thunderprint eval --run out/demo --truth data/sim/demo/truth.toml
 ```
 
 `eval` should report an error of about 0.4 km. Open `out/demo/index.html` to see the map, with modeled and
-observed thunder and a spectrogram underneath it. Lightning for each UTC day is downloaded once and cached in `data/frost/`.
+observed thunder and a spectrogram underneath it. Lightning for each UTC day is downloaded once and cached in `data/frost/`
+(override with `THUNDERPRINT_CACHE`).
 
 ## Python
 

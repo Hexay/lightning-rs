@@ -8,6 +8,7 @@ repository = "https://github.com/Hexay/thunderprint"
 readme = "README.md"
 keywords = ["geolocation", "thunder", "lightning", "acoustics", "osint"]
 categories = ["command-line-utilities", "science", "multimedia::audio"]
+include = ["src/**", "assets/viewer.html", "README.md", "LICENSE"]
 
 [dependencies]
 anyhow = "1.0"
