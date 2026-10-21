@@ -23,13 +23,13 @@ jobs:
           - { runner: macos-15-intel, target: x86_64 }
           - { runner: macos-latest, target: aarch64 }
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: --release --out dist
           manylinux: ${{ matrix.manylinux }}
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.runner }}-${{ matrix.target }}
           path: dist
@@ -37,12 +37,12 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: --out dist
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-sdist
           path: dist
@@ -59,7 +59,7 @@ jobs:
           - { runner: macos-15-intel, target: x86_64-apple-darwin }
           - { runner: macos-latest, target: aarch64-apple-darwin }
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --locked
       - name: Package
@@ -76,7 +76,7 @@ jobs:
             tar -C dist -czf "dist/$name.tar.gz" "$name"
           fi
           rm -r "dist/$name"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: bin-${{ matrix.target }}
           path: dist
@@ -87,7 +87,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -103,7 +103,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: wheels-*
       - uses: actions/attest@v4
@@ -118,7 +118,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Idempotent: skip when this version is already on crates.io (first publish is manual; reruns).
       - id: check
         run: |
