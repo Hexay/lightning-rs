@@ -1,0 +1,2 @@
+# Default weather grid (27 atmospheres) with the 20-strike minimum: A/B against min_strikes_20 (single atmosphere).
+min_strikes = 20

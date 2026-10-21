@@ -1,6 +1,7 @@
 pub mod decode;
 pub mod envelope;
 pub mod filter;
+pub mod spectrogram;
 pub mod stereo;
 
 use anyhow::Result;

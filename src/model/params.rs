@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 pub enum ModelKind {
-    /// Extended-source physics, per-strike uncertainty, Pearson likelihood. See docs/method.md.
+    /// Extended-source physics, per-strike uncertainty, Pearson likelihood. See README.md#how-it-works.
     Improved,
     /// Reimplementation of the video's method: point source 2 km up, 343 m/s, 1/r² capped, cosine.
     Baseline,
@@ -14,19 +14,40 @@ pub struct Atmosphere {
     pub c_mps: f64,
     pub wind_e_mps: f64,
     pub wind_n_mps: f64,
+    /// Temperature lapse rate (K/km) that refracts sound upward; 0 = straight rays, no refraction shadow.
+    #[serde(default)]
+    pub lapse_k_per_km: f64,
+    /// Effective CG onset height under this hypothesis; None uses `Physics::cg_onset_alt_km`.
+    #[serde(default)]
+    pub cg_onset_alt_km: Option<f64>,
 }
 
 impl Atmosphere {
     pub fn from_temp(temp_c: f64, wind_e_mps: f64, wind_n_mps: f64) -> Self {
-        Self { c_mps: 331.3 * (1.0 + temp_c / 273.15).sqrt(), wind_e_mps, wind_n_mps }
+        Self { c_mps: 331.3 * (1.0 + temp_c / 273.15).sqrt(), wind_e_mps, wind_n_mps, lapse_k_per_km: 0.0, cg_onset_alt_km: None }
     }
 
     pub fn still(c_mps: f64) -> Self {
-        Self { c_mps, wind_e_mps: 0.0, wind_n_mps: 0.0 }
+        Self { c_mps, wind_e_mps: 0.0, wind_n_mps: 0.0, lapse_k_per_km: 0.0, cg_onset_alt_km: None }
+    }
+
+    pub fn with_lapse(self, lapse_k_per_km: f64) -> Self {
+        Self { lapse_k_per_km, ..self }
+    }
+
+    pub fn with_cg_onset_alt(self, km: f64) -> Self {
+        Self { cg_onset_alt_km: Some(km), ..self }
+    }
+
+    /// Lowest source height audible at ground range `d_km`: the grazing ray is a circle of radius
+    /// 2T/Γ, so it reaches h = d²Γ/(4T). See research/thunder_physics_lit.md.
+    pub fn shadow_alt_km(&self, d_km: f64) -> f64 {
+        let temp_k = 273.15 * (self.c_mps / 331.3).powi(2);
+        d_km * d_km * self.lapse_k_per_km / (4.0 * temp_k)
     }
 }
 
-/// Priors for the improved model. Rationale for each value: docs/method.md#physics.
+/// Priors for the improved model. Rationale: research/thunder_physics_lit.md.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Physics {

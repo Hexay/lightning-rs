@@ -32,15 +32,21 @@ fn improved(phys: &Physics, atm: &Atmosphere, s: &Strike, listener: &LatLon) -> 
     let (ue, un) = if d > 1e-6 { (e / d, n / d) } else { (1.0, 0.0) };
     let c_kms = (atm.c_mps + atm.wind_e_mps * ue + atm.wind_n_mps * un) / 1000.0;
 
-    let (r_on, r_end, r_amp, gain) = if s.cloud {
+    let refract = atm.lapse_k_per_km > 0.0;
+    let h_min = atm.shadow_alt_km(d);
+    let (r_on, r_end, r_amp, gain, lit_frac) = if s.cloud {
         let near = (d - phys.ic_half_len_km).max(0.0);
-        (near.hypot(phys.ic_alt_km), (d + phys.ic_half_len_km).hypot(phys.ic_alt_km), d.hypot(phys.ic_alt_km), phys.ic_gain)
+        let lit = if h_min < phys.ic_alt_km { 1.0 } else { 0.0 };
+        (near.hypot(phys.ic_alt_km), (d + phys.ic_half_len_km).hypot(phys.ic_alt_km), d.hypot(phys.ic_alt_km), phys.ic_gain, lit)
     } else {
-        (d.hypot(phys.cg_onset_alt_km), d.hypot(phys.cg_top_km), d.hypot(phys.cg_amp_alt_km), 1.0)
+        let lit = ((phys.cg_top_km - h_min) / phys.cg_top_km).clamp(0.0, 1.0);
+        let on_alt = atm.cg_onset_alt_km.unwrap_or(phys.cg_onset_alt_km).max(h_min.min(phys.cg_top_km));
+        let amp_alt = phys.cg_amp_alt_km.max(h_min.min(phys.cg_top_km));
+        (d.hypot(on_alt), d.hypot(phys.cg_top_km), d.hypot(amp_alt), 1.0, lit)
     };
     let onset = s.time + r_on / c_kms;
     let decay_s = ((r_end - r_on) / c_kms * phys.decay_frac).max(phys.min_decay_s);
-    let shadow = 1.0 / (1.0 + (d / phys.audible_km).powi(4));
+    let shadow = if refract { lit_frac } else { 1.0 / (1.0 + (d / phys.audible_km).powi(4)) };
     let current = (s.peak_ka.abs() as f64).max(1.0).powf(phys.current_exp);
     let amp = gain * current * shadow / r_amp.max(phys.min_range_km);
     Arrival {
@@ -48,7 +54,7 @@ fn improved(phys: &Physics, atm: &Atmosphere, s: &Strike, listener: &LatLon) -> 
         decay_s,
         sigma_s: s.sigma_along_km(ue, un) / c_kms,
         area: if phys.power_sum { amp * amp } else { amp } * decay_s,
-        audible: d <= phys.audible_km,
+        audible: d <= phys.audible_km && lit_frac > 0.0,
         bearing_rad: (-e).atan2(-n),
     }
 }

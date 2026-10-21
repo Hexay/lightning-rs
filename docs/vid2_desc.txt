@@ -1,7 +1,0 @@
-I used my acoustic signal processing pipeline and data from the Norwegian weather API to localize a storm recording sent in by a subscriber.
-
-Lightning strike timing and position data was pulled from the Norwegian Meteorological Institute's public API. This enabled higher spatial precision at ~200m vs ~3km deviation from the public Blitzortung dataset used in the prior video. 
-
-Selective lightning strike weighting was added to the scoring algorithm to prioritize strikes outside of the main cluster.
-
-The positional accuracy was still relatively poor at 2.2km away, given the spatial precision of the dataset; this was largely due to the heavy clustering of strikes away from the listener, limiting triangulation ability. With strikes coming from multiple directions, ~500m accuracy should be feasible.

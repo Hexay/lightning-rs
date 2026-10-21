@@ -40,10 +40,29 @@ overrides! {
 
 pub fn search_config(kind: ModelKind, overrides: Option<&Path>) -> anyhow::Result<SearchConfig> {
     let mut cfg = defaults(kind);
+    let mut onsets = DEFAULT_CG_ONSET_ALTS_KM.to_vec();
     if let Some(p) = overrides {
-        toml::from_str::<Overrides>(&std::fs::read_to_string(p)?)?.apply(&mut cfg);
+        let mut table: toml::Table = toml::from_str(&std::fs::read_to_string(p)?)?;
+        let mut take = |key: &str| -> anyhow::Result<Option<Vec<f64>>> { Ok(table.remove(key).map(|v| v.try_into()).transpose()?) };
+        let (lapses, onset_override) = (take("lapse_k_per_km")?, take("cg_onset_alt_km")?);
+        table.try_into::<Overrides>()?.apply(&mut cfg);
+        if let Some(l) = lapses {
+            cfg.nuisance = cross(&cfg.nuisance, &l, Atmosphere::with_lapse);
+        }
+        onsets = onset_override.unwrap_or(onsets);
     }
+    cfg.nuisance = cross(&cfg.nuisance, &onsets, Atmosphere::with_cg_onset_alt);
     Ok(cfg)
+}
+
+/// Fitted CG onset heights: real thunder times like a source ~6 km up, sims pick 0.
+/// See research/empirical_thunder_response.md. `cg_onset_alt_km = [..]` overrides; `[0.0]` disables.
+const DEFAULT_CG_ONSET_ALTS_KM: [f64; 3] = [0.0, 3.0, 6.0];
+
+/// Top-level `lapse_k_per_km = [..]` / `cg_onset_alt_km = [..]` in an overrides file cross the
+/// nuisance atmospheres with these values.
+fn cross(atms: &[Atmosphere], values: &[f64], with: fn(Atmosphere, f64) -> Atmosphere) -> Vec<Atmosphere> {
+    atms.iter().flat_map(|&a| values.iter().map(move |&v| with(a, v))).collect()
 }
 
 fn defaults(kind: ModelKind) -> SearchConfig {

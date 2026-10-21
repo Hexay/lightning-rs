@@ -6,6 +6,7 @@
 <title>Thunder Locator</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-cartesian-dist-min@2.35.2/plotly-cartesian.min.js"></script>
 <style>
   :root { --bg: #f6f6f4; --panel: #ffffffee; --fg: #1d1d1f; --muted: #6b6b70; --line: #d8d8dc; }
   @media (prefers-color-scheme: dark) {
@@ -13,7 +14,10 @@
   }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
     font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display: flex; flex-direction: column; }
+  #top { position: relative; flex: 1; min-height: 0; }
   #map { position: absolute; inset: 0; }
+  #trace { height: 42vh; border-top: 1px solid var(--line); }
   .panel { position: absolute; z-index: 1000; top: 12px; right: 12px; width: 280px; max-height: calc(100% - 24px);
     overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
     backdrop-filter: blur(6px); }
@@ -31,6 +35,7 @@
 </style>
 </head>
 <body>
+<div id="top">
 <div id="map"></div>
 <div class="panel">
   <h1>Thunder locator</h1>
@@ -47,9 +52,13 @@
   <div class="ramp"></div><div class="legend"><span id="lo">low</span><span id="hi">high</span></div>
   <div id="cands"></div>
 </div>
+</div>
+<div id="trace"></div>
 <script>
 const DATA = /*GEOJSON*/null;
 const RUN = /*RUN*/null;
+const TRACES = /*TRACES*/null;
+const SPEC = /*SPEC*/null;
 const RAMP = ["#30123b","#4662d7","#1ae4b6","#a2fc3c","#fabb39","#e4460a","#7a0403"];
 const color = t => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.round(t * (RAMP.length - 1))))];
 
@@ -59,6 +68,7 @@ const osm = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Wo
   { maxZoom: 19, attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors" }).addTo(map);
 const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Esri" });
 L.control.layers({ "Map": osm, "Satellite": sat }, {}, { position: "topleft" }).addTo(map);
+map.attributionControl.addAttribution('Lightning: <a href="https://www.met.no">MET Norway</a>');
 
 const cells = DATA.features.filter(f => f.properties.kind === "cell");
 const cands = DATA.features.filter(f => f.properties.kind === "candidate");
@@ -106,7 +116,8 @@ const markers = cands.map(f => {
     .bindPopup(html).addTo(map);
   const div = document.createElement("div");
   div.className = "cand"; div.innerHTML = html;
-  div.onclick = () => { map.setView([lat, lon], 13); m.openPopup(); };
+  div.onclick = () => { map.setView([lat, lon], 13); m.openPopup(); showTrace(p.rank); };
+  m.on("click", () => showTrace(p.rank));
   document.getElementById("cands").appendChild(div);
   return m;
 });
@@ -128,6 +139,40 @@ document.getElementById("runinfo").textContent = RUN ? `${RUN.model} model · ${
 document.querySelectorAll("input, select").forEach(e => e.addEventListener("change", draw));
 draw();
 if (markers.length) map.setView(markers[0].getLatLng(), 11); else map.fitBounds(layer.getBounds());
+
+const INFERNO = [[0, "#000004"], [0.2, "#420a68"], [0.4, "#932667"], [0.6, "#dd513a"], [0.8, "#fca50a"], [1, "#fcffa4"]];
+// Naive ISO strings so Plotly labels the axis in UTC rather than the viewer's local time.
+const utc = s => new Date(s * 1000).toISOString().slice(0, 23);
+const specRows = (() => {
+  const b = Uint8Array.from(atob(SPEC.data_b64), c => c.charCodeAt(0));
+  return SPEC.freqs_hz.map((_, k) => Array.from(b.subarray(k * SPEC.frames, (k + 1) * SPEC.frames)));
+})();
+
+function showTrace(rank) {
+  const r = TRACES.regions.find(r => r.rank === rank) ?? TRACES.regions[0];
+  if (!r) return;
+  const css = getComputedStyle(document.documentElement);
+  const fg = css.getPropertyValue("--fg").trim(), grid = css.getPropertyValue("--line").trim();
+  const t = TRACES.observed.map((_, i) => utc(r.start + i / TRACES.rate_hz));
+  const tSpec = specRows[0].map((_, i) => utc(r.start + SPEC.t0_s + i * SPEC.hop_s));
+  const line = (y, name, color) => ({ x: t, y, name, type: "scatter", mode: "lines", line: { color, width: 1.2 } });
+  Plotly.react("trace", [
+    line(TRACES.observed, "observed", "#74b9ff"),
+    line(r.model, "modeled", "#ff6b6b"),
+    { x: tSpec, y: SPEC.freqs_hz, z: specRows, type: "heatmap", yaxis: "y2", colorscale: INFERNO, showscale: false,
+      zmin: 0, zmax: 255, hovertemplate: "%{x}<br>%{y:.0f} Hz<extra></extra>" },
+  ], {
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", font: { color: fg, size: 11 },
+    margin: { l: 56, r: 16, t: 28, b: 36 },
+    title: { text: `#${r.rank} · start ${utc(r.start).slice(11)} UTC`, font: { size: 12 }, x: 0.01 },
+    legend: { orientation: "h", x: 1, xanchor: "right", y: 1.08 },
+    xaxis: { type: "date", title: { text: "UTC" }, gridcolor: grid, anchor: "y2" },
+    yaxis: { domain: [0.52, 1], title: { text: "normalized amp" }, gridcolor: grid, rangemode: "tozero" },
+    yaxis2: { domain: [0, 0.48], type: "log", title: { text: "Hz" }, gridcolor: grid,
+      tickvals: [10, 20, 50, 100, 200, 500, 1000], ticktext: ["10", "20", "50", "100", "200", "500", "1k"] },
+  }, { responsive: true, displaylogo: false });
+}
+if (TRACES?.regions.length) showTrace(TRACES.regions[0].rank); else document.getElementById("trace").remove();
 </script>
 </body>
 </html>

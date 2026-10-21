@@ -9,3 +9,4 @@ pub mod robust;
 pub mod scorer;
 pub mod select;
 pub mod shape;
+pub mod trace;

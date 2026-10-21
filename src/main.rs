@@ -55,6 +55,12 @@ enum Cmd {
         wind_e: f64,
         #[arg(long, default_value_t = 0.0)]
         wind_n: f64,
+        /// Temperature lapse rate, K/km (0 = no refraction shadow).
+        #[arg(long, default_value_t = 0.0)]
+        lapse: f64,
+        /// CG channel radiates weakly below this height, km (0 = uniform).
+        #[arg(long, default_value_t = 0.0)]
+        cg_quiet_below: f64,
         #[arg(long, default_value_t = 0.02)]
         noise: f64,
         #[arg(long, default_value_t = 4)]
@@ -126,23 +132,24 @@ fn main() -> Result<()> {
             println!("{n} strikes on {date}");
         }
         Cmd::Locate { audio, date, start, model, out } => locate(&audio, &date, start.as_deref(), &model, &out)?,
-        Cmd::Sim { date, lat, lon, start, duration, temp, wind_e, wind_n, noise, cars, seed, mic_spacing, mic_axis, out } => {
+        Cmd::Sim { date, lat, lon, start, duration, temp, wind_e, wind_n, lapse, cg_quiet_below, noise, cars, seed, mic_spacing, mic_axis, out } => {
             let day = geo::parse_date(&date)?;
             let sc = sim::Scenario {
                 listener: geo::LatLon::new(lat, lon),
                 start: geo::parse_hms(day, &start)?,
                 duration_s: duration,
-                atm: model::params::Atmosphere::from_temp(temp, wind_e, wind_n),
+                atm: model::params::Atmosphere::from_temp(temp, wind_e, wind_n).with_lapse(lapse),
                 noise_level: noise,
                 car_passes: cars,
                 seed,
                 mics: (mic_spacing > 0.0).then_some(sim::Mics { spacing_m: mic_spacing, axis_deg: mic_axis }),
+                cg_quiet_below_km: cg_quiet_below,
             };
             let strikes = strikes::frost::load_range(day, day + 86400.0, CACHE_DIR.as_ref())?;
             std::fs::create_dir_all(&out)?;
             sim::write_wav(&out.join("audio.wav"), &sim::synthesize(&strikes, &sc))?;
             let truth = format!(
-                "lat = {lat}\nlon = {lon}\nstart = {}\n# temp_c = {temp}, wind_e = {wind_e}, wind_n = {wind_n}, seed = {seed}\n",
+                "lat = {lat}\nlon = {lon}\nstart = {}\n# temp_c = {temp}, wind_e = {wind_e}, wind_n = {wind_n}, lapse = {lapse}, cg_quiet_below = {cg_quiet_below}, seed = {seed}\n",
                 sc.start
             );
             std::fs::write(out.join("truth.toml"), truth)?;
@@ -156,7 +163,9 @@ fn main() -> Result<()> {
             if bench {
                 search::probe::bench(&cfg, &index, &audio, day, p, start);
             } else {
-                search::probe::print(&cfg, &index, &audio, day, p, start);
+                let best = search::probe::print(&cfg, &index, &audio, day, p, start);
+                let atm = model::params::Atmosphere::from_temp(15.0, 0.0, 0.0);
+                onset::residuals::report(&index, &cfg.phys, &atm, &audio, p, start.unwrap_or(best));
             }
         }
         Cmd::Eval { run, truth } => eval::report(&run, &eval::load_truth(&truth)?)?,
@@ -196,7 +205,9 @@ fn locate(audio_path: &std::path::Path, date: &str, start: Option<&str>, args: &
         "physics": cfg.phys,
     });
     let onset_solutions = if model == ModelKind::Improved { solve_onsets(&cfg, &index, &audio, &result) } else { vec![] };
-    output::write_all(out, &result, &onset_solutions, run_info)?;
+    let traces = search::trace::region_traces(&cfg, &index, &audio, &result.regions);
+    let spec = audio::spectrogram::load(audio_path)?;
+    output::write_all(out, &result, &onset_solutions, &traces, &spec, run_info)?;
     for s in &onset_solutions {
         println!(
             "onset solve: {:.5},{:.5} ±{:.2}/{:.2} km  start {}  {}/{} onsets matched, rms {:.2}s",

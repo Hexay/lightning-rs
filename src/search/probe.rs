@@ -1,4 +1,4 @@
-use super::pipeline::{SearchConfig, observed_feature, scorer};
+use super::pipeline::{SearchConfig, scorer};
 use super::scorer::Workspace;
 use crate::audio::BandAudio;
 use crate::geo::{LatLon, format_utc};
@@ -6,7 +6,9 @@ use crate::model::params::{Atmosphere, BASELINE_C_MPS, ModelKind};
 use crate::strikes::StrikeIndex;
 
 /// Prints each stage's whole-day score at `p`, and the score with the start pinned to `start`.
-pub fn print(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64, f64), p: LatLon, start: Option<f64>) {
+/// Returns the fine stage's best whole-day start.
+pub fn print(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f64, f64), p: LatLon, start: Option<f64>) -> f64 {
+    let mut fine_start = 0.0;
     let atm = match cfg.kind {
         ModelKind::Improved => Atmosphere::from_temp(15.0, 0.0, 0.0),
         ModelKind::Baseline => Atmosphere::still(BASELINE_C_MPS),
@@ -14,6 +16,7 @@ pub fn print(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f
     let mut ws = Workspace::default();
     for (name, stage) in [("coarse", cfg.coarse), ("mid", cfg.mid), ("fine", cfg.fine)] {
         let day_s = scorer(cfg, index, audio, stage, (day.0, day.1 - audio.duration_s)).score(&p, &atm, &mut ws);
+        fine_start = day_s.best_start;
         print!(
             "{name:>6}: day  rho {:.3} log_ev {:7.2} doa {:.1} start {} ({} strikes)",
             day_s.best_rho,
@@ -31,6 +34,7 @@ pub fn print(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f
     if let Some(t) = start {
         dump_fine(cfg, index, audio, p, &atm, t);
     }
+    fine_start
 }
 
 /// Single-threaded per-call cost of each scoring phase, per stage, on a 10×10 grid around `p`.
@@ -66,14 +70,9 @@ pub fn bench(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, day: (f
 
 /// Writes out/probe.csv: time, observed, model (fine stage, start pinned), both scaled to unit max.
 fn dump_fine(cfg: &SearchConfig, index: &StrikeIndex, audio: &BandAudio, p: LatLon, atm: &Atmosphere, t: f64) {
-    let st = cfg.fine;
-    let sc = scorer(cfg, index, audio, st, (t, t + 0.5 / st.rate_hz));
-    let model = sc.model_window(&p, atm, &mut Workspace::default());
-    let obs = observed_feature(cfg, audio, st);
-    let norm = |v: &[f32]| v.iter().fold(1e-30f32, |m, x| m.max(*x));
-    let (mo, mm) = (norm(&obs), norm(&model));
+    let (obs, model) = super::trace::fitted_pair(cfg, index, audio, p, atm, t);
     let rows: String = (0..obs.len().min(model.len()))
-        .map(|i| format!("{:.2},{:.4},{:.4}\n", i as f64 / st.rate_hz, obs[i] / mo, model[i] / mm))
+        .map(|i| format!("{:.2},{:.4},{:.4}\n", i as f64 / cfg.fine.rate_hz, obs[i], model[i]))
         .collect();
     let _ = std::fs::create_dir_all("out");
     let _ = std::fs::write("out/probe.csv", format!("t,observed,model\n{rows}"));

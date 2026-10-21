@@ -20,6 +20,8 @@ pub struct Scenario {
     pub seed: u64,
     /// Two-mic recorder (stereo output); None writes mono.
     pub mics: Option<Mics>,
+    /// CG segments below this height (km) radiate weaker, ∝ (z/h)²; 0 = uniform channel.
+    pub cg_quiet_below_km: f64,
 }
 
 #[derive(Clone, Copy)]
@@ -33,6 +35,7 @@ pub struct Mics {
 const NOISE_DECORRELATION: f32 = 0.15;
 
 const MAX_RANGE_KM: f64 = 60.0;
+const SHADOW_EDGE_KM: f64 = 0.25;
 
 /// Synthesises thunder audio for `sc` from real `strikes`, jittering each strike by its error ellipse.
 /// Returns one channel, or [left, right] when `sc.mics` is set.
@@ -55,7 +58,8 @@ pub fn synthesize(strikes: &[Strike], sc: &Scenario) -> Vec<Vec<f32>> {
         let strength = (s.peak_ka.abs() as f64).max(1.0).sqrt() * if s.cloud { 0.4 } else { 1.0 };
         let wavelet_hz = rng.gen_range(40.0..120.0);
         for seg in &segs {
-            emit(&mut out, seg, s.time - sc.start, strength, wavelet_hz, &sc.atm, sc.mics);
+            let w = if s.cloud || sc.cg_quiet_below_km <= 0.0 { 1.0 } else { (seg.pos[2] / sc.cg_quiet_below_km).clamp(0.0, 1.0).powi(2) };
+            emit(&mut out, seg, s.time - sc.start, strength * w, wavelet_hz, &sc.atm, sc.mics);
         }
     }
     let peak = out.iter().flatten().fold(0.0f32, |m, v| m.max(v.abs())).max(1e-9);
@@ -74,7 +78,12 @@ fn emit(out: &mut [Vec<f32>], seg: &channel::Segment, t_rel: f64, strength: f64,
     let t = t_rel + r / c_kms;
     let cos_los = -(seg.pos[0] * seg.dir[0] + seg.pos[1] * seg.dir[1] + seg.pos[2] * seg.dir[2]) / r;
     let directivity = (1.0 - cos_los * cos_los).max(0.0);
-    let shadow = (-(h / 16.0).powi(3)).exp();
+    let shadow = if atm.lapse_k_per_km > 0.0 {
+        // Below the grazing ray only diffracted/scattered sound arrives; decays with depth into the shadow.
+        (-(atm.shadow_alt_km(h) - seg.pos[2]).max(0.0) / SHADOW_EDGE_KM).exp()
+    } else {
+        (-(h / 16.0).powi(3)).exp()
+    };
     let amp = strength * seg.len_km * directivity * shadow / r;
     // Plane wave from bearing az: the mic displaced toward az hears it (spacing/2)·cos(az−axis)/c earlier.
     let half_lead = mics.map_or(0.0, |m| {

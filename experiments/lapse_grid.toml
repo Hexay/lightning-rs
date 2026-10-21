@@ -1,0 +1,2 @@
+# Fit the lapse rate as a nuisance alongside temperature/wind.
+lapse_k_per_km = [0.0, 4.0, 6.5, 9.8]

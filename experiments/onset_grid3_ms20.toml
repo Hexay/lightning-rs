@@ -1,0 +1,3 @@
+# Cheaper onset-height nuisance (3 values) on top of min_strikes 20; compare onset_grid_ms20.toml.
+min_strikes = 20
+cg_onset_alt_km = [0.0, 3.0, 6.0]

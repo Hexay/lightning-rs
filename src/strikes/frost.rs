@@ -41,7 +41,12 @@ fn download(referencetime: &str) -> Result<String> {
         .set("Authorization", &format!("Basic {auth}"))
         .call();
     match resp {
-        Ok(r) => Ok(r.into_string()?),
+        // into_string caps at 10 MB; busy storm days exceed it.
+        Ok(r) => {
+            let mut text = String::new();
+            std::io::Read::read_to_string(&mut r.into_reader(), &mut text)?;
+            Ok(text)
+        }
         // Frost answers 404 for a range with no strikes.
         Err(ureq::Error::Status(404, _)) => Ok(String::new()),
         Err(e) => Err(e).context("Frost request failed"),
